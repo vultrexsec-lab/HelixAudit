@@ -7,7 +7,7 @@ HelixAudit helps security professionals perform structured, sequential reconnais
 > ⚠️ **AUTHORIZED USE ONLY**  
 > Only scan systems you own or have explicit written permission (Rules of Engagement) to test. Unauthorized scanning is illegal.
 
-## Current Version: 0.6.0 (Phase 6)
+## Current Version: 0.8.0 (Phase 8)
 
 ### Features
 
@@ -48,7 +48,8 @@ Simple UI is in `/frontend`. Point `API_BASE` inside `index.html` to your backen
 | GET | `/api/v1/scans/{id}/findings` | List findings |
 | GET | `/api/v1/scans/{id}/assets` | List assets |
 | PATCH | `/api/v1/findings/{id}` | Update finding status |
-| GET | `/api/v1/scans/{id}/report` | HTML report |
+| GET | `/api/v1/scans/{id}/report` | HTML report (Print/PDF)
+| GET | `/api/v1/scans/{id}/export` | JSON export |
 
 ### Production Notes
 

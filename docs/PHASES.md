@@ -1,20 +1,15 @@
 # HelixAudit Development Phases
 
-## Phase 1–6 ✅ Completed earlier
+## Phases 1–7 ✅ Completed
 
-## Phase 7: Enhanced UX + Practical Workflow ✅ (Current)
+## Phase 8: Export & Final Polish ✅ (Current)
 
-- Frontend major upgrade
-- Finding status change directly from UI (Confirmed / False Positive / Fixed / Retest)
-- Evidence + Remediation visible in findings table
-- Tabs for Findings / Assets
-- Optional API Key field in UI
-- Better report access button
-- Version 0.7.0
+- Enhanced professional HTML report
+  - Executive summary
+  - Evidence + Remediation in report
+  - Print / Save as PDF button
+- JSON export endpoint: `GET /api/v1/scans/{id}/export`
+- Frontend buttons for HTML Report + JSON Export
+- Version 0.8.0
 
-### Remaining optional future work
-- Full user accounts & login
-- PDF export
-- Authenticated application scanning
-- Scheduled scans
-- Multi-tenant teams
+### Platform is now feature-complete for core authorized assessment workflow.

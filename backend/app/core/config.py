@@ -4,7 +4,7 @@ from typing import Optional, List
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "HelixAudit"
-    VERSION: str = "0.7.0-phase7"
+    VERSION: str = "0.8.0-phase8"
     API_V1_STR: str = "/api/v1"
     
     # Security

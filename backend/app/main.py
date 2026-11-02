@@ -38,7 +38,7 @@ async def root():
     return {
         "name": settings.PROJECT_NAME,
         "version": settings.VERSION,
-        "phase": "Phase 7 - Enhanced UX + Reporting",
+        "phase": "Phase 8 - Export Phase 7 - Enhanced UX + Reporting Final Polish",
         "message": "Authorized use only. Always obtain written permission before scanning.",
         "docs": "/docs",
         "features": [
@@ -59,7 +59,7 @@ async def health():
     return {
         "status": "healthy",
         "version": settings.VERSION,
-        "phase": "7"
+        "phase": "8"
     }
 
 

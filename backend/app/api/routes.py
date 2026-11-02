@@ -152,7 +152,8 @@ def list_project_scans(project_id: int, db: Session = Depends(get_db)):
     return db.query(Scan).filter(Scan.project_id == project_id).order_by(Scan.created_at.desc()).all()
 
 
-# ---------- Phase 5: Finding Lifecycle + Report ----------
+
+# ---------- Phase 5 + 8: Finding Lifecycle + Enhanced Reports ----------
 
 class FindingStatusUpdate(BaseModel):
     status: str  # new, confirmed, false_positive, fixed, retest
@@ -172,67 +173,101 @@ def update_finding_status(finding_id: int, payload: FindingStatusUpdate, db: Ses
     return finding
 
 
-@router.get("/scans/{scan_id}/report")
-def generate_report(scan_id: int, db: Session = Depends(get_db)):
-    """Generate a simple professional HTML report for the scan."""
-    from fastapi.responses import HTMLResponse
-
+def _build_report_data(db: Session, scan_id: int):
     scan = db.query(Scan).filter(Scan.id == scan_id).first()
     if not scan:
-        raise HTTPException(status_code=404, detail="Scan not found")
-
+        return None
     project = db.query(Project).filter(Project.id == scan.project_id).first()
-    findings = db.query(Finding).filter(Finding.scan_id == scan_id).order_by(Finding.severity).all()
+    findings = db.query(Finding).filter(Finding.scan_id == scan_id).all()
     assets = db.query(Asset).filter(Asset.scan_id == scan_id).all()
-
     severity_order = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
     findings_sorted = sorted(findings, key=lambda f: severity_order.get(f.severity, 5))
-
     counts = {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0}
     for f in findings:
         counts[f.severity] = counts.get(f.severity, 0) + 1
+    return {
+        "scan": scan,
+        "project": project,
+        "findings": findings_sorted,
+        "assets": assets,
+        "counts": counts,
+    }
+
+
+@router.get("/scans/{scan_id}/report")
+def generate_report(scan_id: int, db: Session = Depends(get_db)):
+    """Professional HTML report (print / Save as PDF from browser)."""
+    from fastapi.responses import HTMLResponse
+
+    data = _build_report_data(db, scan_id)
+    if not data:
+        raise HTTPException(status_code=404, detail="Scan not found")
+
+    scan, project, findings, assets, counts = (
+        data["scan"], data["project"], data["findings"], data["assets"], data["counts"]
+    )
 
     rows = ""
-    for f in findings_sorted:
+    for f in findings:
+        evidence = (f.evidence or "")[:300].replace("<", "&lt;").replace(">", "&gt;")
+        remediation = (f.remediation or "")[:250].replace("<", "&lt;").replace(">", "&gt;")
         rows += f"""
         <tr>
-          <td><span class="sev {f.severity}">{f.severity.upper()}</span></td>
-          <td>{f.title or ''}</td>
-          <td>{f.category or ''}</td>
-          <td>{f.location or ''}</td>
-          <td>{f.status or 'new'}</td>
+          <td><span class="sev {f.severity}">{(f.severity or '').upper()}</span></td>
+          <td>
+            <strong>{(f.title or '').replace('<','&lt;')}</strong><br/>
+            <small>{(f.location or '')}</small>
+            {f'<div class="ev">{evidence}</div>' if evidence else ''}
+            {f'<div class="rem"><b>Remediation:</b> {remediation}</div>' if remediation else ''}
+          </td>
+          <td>{(f.category or '')}</td>
+          <td>{(f.status or 'new')}</td>
         </tr>"""
 
+    asset_rows = "".join(
+        f"<tr><td>{a.asset_type}</td><td>{(a.value or '')[:120]}</td></tr>"
+        for a in assets[:100]
+    )
+
     html = f"""<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>HelixAudit Report - Scan #{scan.id}</title>
+<html><head><meta charset="utf-8">
+<title>HelixAudit Report - Scan #{scan.id}</title>
 <style>
-  body {{ font-family: system-ui, sans-serif; margin: 2rem; color: #1e293b; }}
-  h1 {{ color: #0f172a; }}
-  .meta {{ color: #64748b; margin-bottom: 1.5rem; }}
-  .summary {{ display: flex; gap: 1rem; margin: 1.5rem 0; flex-wrap: wrap; }}
-  .box {{ background: #f1f5f9; padding: 1rem 1.25rem; border-radius: 8px; min-width: 100px; text-align: center; }}
-  .box strong {{ display: block; font-size: 1.5rem; }}
-  table {{ width: 100%; border-collapse: collapse; margin-top: 1rem; }}
-  th, td {{ text-align: left; padding: 0.6rem; border-bottom: 1px solid #e2e8f0; font-size: 0.9rem; }}
+  body {{ font-family: system-ui, -apple-system, sans-serif; margin: 2rem; color: #0f172a; }}
+  h1 {{ margin-bottom: 0.25rem; }}
+  .meta {{ color: #64748b; margin-bottom: 1.5rem; font-size: 0.95rem; }}
+  .summary {{ display: flex; gap: 0.75rem; flex-wrap: wrap; margin: 1rem 0 1.5rem; }}
+  .box {{ background: #f1f5f9; padding: 0.9rem 1.1rem; border-radius: 8px; min-width: 90px; text-align: center; }}
+  .box strong {{ display: block; font-size: 1.4rem; }}
+  table {{ width: 100%; border-collapse: collapse; margin-top: 0.75rem; font-size: 0.9rem; }}
+  th, td {{ text-align: left; padding: 0.55rem 0.65rem; border-bottom: 1px solid #e2e8f0; vertical-align: top; }}
   th {{ background: #f8fafc; }}
-  .sev {{ padding: 0.15rem 0.45rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }}
+  .sev {{ padding: 0.12rem 0.4rem; border-radius: 4px; font-size: 0.72rem; font-weight: 700; }}
   .critical {{ background: #fee2e2; color: #991b1b; }}
   .high {{ background: #ffedd5; color: #9a3412; }}
   .medium {{ background: #fef3c7; color: #92400e; }}
   .low {{ background: #dbeafe; color: #1e40af; }}
   .info {{ background: #f1f5f9; color: #475569; }}
-  .footer {{ margin-top: 2rem; font-size: 0.8rem; color: #94a3b8; }}
+  .ev, .rem {{ color: #64748b; font-size: 0.8rem; margin-top: 0.25rem; }}
+  .footer {{ margin-top: 2rem; font-size: 0.8rem; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 1rem; }}
+  .actions {{ margin: 1rem 0; }}
+  .actions button {{ margin-right: 0.5rem; padding: 0.45rem 0.9rem; border-radius: 6px; border: 1px solid #cbd5e1; background: #fff; cursor: pointer; }}
+  @media print {{ .actions {{ display: none; }} body {{ margin: 0.5rem; }} }}
 </style></head>
 <body>
   <h1>HelixAudit Security Assessment Report</h1>
   <div class="meta">
-    <div><strong>Project:</strong> {project.name if project else 'N/A'}</div>
+    <div><strong>Project:</strong> {project.name if project else 'N/A'} {f'({project.client_name})' if project and project.client_name else ''}</div>
     <div><strong>Target:</strong> {scan.target}</div>
     <div><strong>Scan ID:</strong> #{scan.id} &nbsp;|&nbsp; <strong>Status:</strong> {scan.status}</div>
-    <div><strong>Started:</strong> {scan.started_at} &nbsp;|&nbsp; <strong>Completed:</strong> {scan.completed_at}</div>
+    <div><strong>Window:</strong> {scan.started_at} → {scan.completed_at}</div>
   </div>
 
-  <h2>Summary</h2>
+  <div class="actions">
+    <button onclick="window.print()">Print / Save as PDF</button>
+  </div>
+
+  <h2>Executive Summary</h2>
   <div class="summary">
     <div class="box"><strong>{counts['critical']}</strong>Critical</div>
     <div class="box"><strong>{counts['high']}</strong>High</div>
@@ -240,16 +275,69 @@ def generate_report(scan_id: int, db: Session = Depends(get_db)):
     <div class="box"><strong>{counts['low']}</strong>Low</div>
     <div class="box"><strong>{counts['info']}</strong>Info</div>
     <div class="box"><strong>{len(assets)}</strong>Assets</div>
+    <div class="box"><strong>{len(findings)}</strong>Findings</div>
   </div>
 
   <h2>Findings</h2>
   <table>
-    <thead><tr><th>Severity</th><th>Title</th><th>Category</th><th>Location</th><th>Status</th></tr></thead>
-    <tbody>{rows or '<tr><td colspan="5">No findings</td></tr>'}</tbody>
+    <thead><tr><th>Severity</th><th>Title / Evidence / Remediation</th><th>Category</th><th>Status</th></tr></thead>
+    <tbody>{rows or '<tr><td colspan="4">No findings</td></tr>'}</tbody>
+  </table>
+
+  <h2>Discovered Assets (sample)</h2>
+  <table>
+    <thead><tr><th>Type</th><th>Value</th></tr></thead>
+    <tbody>{asset_rows or '<tr><td colspan="2">No assets</td></tr>'}</tbody>
   </table>
 
   <div class="footer">
-    Generated by HelixAudit • Authorized testing only • This report is confidential.
+    Generated by HelixAudit v0.8 • Authorized testing only • Confidential<br/>
+    This automated report supports professional assessment and does not replace expert manual testing.
   </div>
 </body></html>"""
     return HTMLResponse(content=html)
+
+
+@router.get("/scans/{scan_id}/export")
+def export_scan_json(scan_id: int, db: Session = Depends(get_db)):
+    """Machine-readable JSON export of scan results."""
+    data = _build_report_data(db, scan_id)
+    if not data:
+        raise HTTPException(status_code=404, detail="Scan not found")
+
+    scan, project, findings, assets, counts = (
+        data["scan"], data["project"], data["findings"], data["assets"], data["counts"]
+    )
+    return {
+        "scan": {
+            "id": scan.id,
+            "target": scan.target,
+            "status": scan.status,
+            "progress": scan.progress,
+            "started_at": str(scan.started_at) if scan.started_at else None,
+            "completed_at": str(scan.completed_at) if scan.completed_at else None,
+        },
+        "project": {
+            "id": project.id if project else None,
+            "name": project.name if project else None,
+            "client_name": project.client_name if project else None,
+        },
+        "summary": counts,
+        "findings": [
+            {
+                "id": f.id,
+                "title": f.title,
+                "severity": f.severity,
+                "category": f.category,
+                "location": f.location,
+                "evidence": f.evidence,
+                "remediation": f.remediation,
+                "status": f.status,
+            }
+            for f in findings
+        ],
+        "assets": [
+            {"id": a.id, "type": a.asset_type, "value": a.value}
+            for a in assets
+        ],
+    }

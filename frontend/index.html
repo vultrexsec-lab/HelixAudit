@@ -62,7 +62,7 @@
         <div class="logo">HelixAudit</div>
         <div style="color:var(--muted);font-size:0.85rem;margin-top:0.2rem">Authorized Security Scanner</div>
       </div>
-      <span class="badge">Phase 7 • Enhanced UX</span>
+      <span class="badge">Phase 8 • Export Ready</span>
     </header>
 
     <div class="warning-box">
@@ -96,8 +96,9 @@
       </div>
       <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
       <div style="font-size:0.85rem;color:var(--muted)" id="scanMeta"></div>
-      <div style="margin-top:1rem;display:none" id="reportBtnWrap">
-        <a id="reportLink" href="#" target="_blank" class="btn btn-secondary btn-sm" style="text-decoration:none">View / Download HTML Report</a>
+      <div style="margin-top:1rem;display:none;gap:0.5rem;flex-wrap:wrap" id="reportBtnWrap">
+        <a id="reportLink" href="#" target="_blank" class="btn btn-secondary btn-sm" style="text-decoration:none">HTML Report (Print/PDF)</a>
+        <a id="jsonLink" href="#" target="_blank" class="btn btn-secondary btn-sm" style="text-decoration:none">JSON Export</a>
       </div>
     </div>
 
@@ -183,6 +184,8 @@
             const link = document.getElementById("reportLink");
             wrap.style.display = "block";
             link.href = `${API_BASE}/scans/${currentScanId}/report`;
+            const jsonLink = document.getElementById("jsonLink");
+            if (jsonLink) jsonLink.href = `${API_BASE}/scans/${currentScanId}/export`;
           }
         }
       } catch (e) { console.error(e); }

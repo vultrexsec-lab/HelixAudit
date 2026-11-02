@@ -1,9 +1,8 @@
 """
-HelixAudit Scan Service
-Phases 1–4: Discovery + Crawling + Secrets + OWASP surface checks
+HelixAudit Scan Service - Phases 1 to 5
+Discovery + Crawling + Secrets + Expanded OWASP + Reporting support
 """
 
-import asyncio
 from datetime import datetime
 from sqlalchemy.orm import Session
 from ..models.models import Scan, Asset, Finding, ScanStatus, Severity
@@ -12,21 +11,19 @@ from ..scanners.portscan import run_nmap_scan
 from ..scanners.techdetect import detect_technologies
 from ..scanners.crawler import crawl_site, directory_discovery, fetch_and_analyze
 from ..scanners.secrets import find_secrets_in_text
-from ..scanners.owasp_checks import run_owasp_surface_checks
+from ..scanners.owasp_checks import run_full_owasp_checks
 from urllib.parse import urlparse
 import httpx
 
 
 def _sev(s: str) -> str:
-    s = (s or "info").lower()
-    mapping = {
+    return {
         "critical": Severity.CRITICAL.value,
         "high": Severity.HIGH.value,
         "medium": Severity.MEDIUM.value,
         "low": Severity.LOW.value,
         "info": Severity.INFO.value,
-    }
-    return mapping.get(s, Severity.INFO.value)
+    }.get((s or "info").lower(), Severity.INFO.value)
 
 
 async def run_discovery_scan(db: Session, scan_id: int):
@@ -50,22 +47,20 @@ async def run_discovery_scan(db: Session, scan_id: int):
         scan.progress = 8
         db.commit()
         try:
-            subdomains = await enumerate_subdomains(target)
-            for sub in subdomains:
+            for sub in await enumerate_subdomains(target):
                 db.add(Asset(scan_id=scan.id, asset_type="subdomain", value=sub,
                              extra_data={"source": "enumeration"}))
             db.commit()
         except Exception as e:
-            print(f"Subdomain error: {e}")
+            print("Subdomain error:", e)
 
         # 2. Ports
-        scan.progress = 16
+        scan.progress = 15
         db.commit()
-        parsed = urlparse(target if "://" in target else f"http://{target}")
-        host = (parsed.netloc or parsed.path).split(":")[0].split("/")[0]
+        host = urlparse(target if "://" in target else f"http://{target}").netloc or target
+        host = host.split(":")[0].split("/")[0]
         try:
-            ports_data = run_nmap_scan(host)
-            for p in ports_data:
+            for p in run_nmap_scan(host):
                 db.add(Asset(scan_id=scan.id, asset_type="port",
                              value=f"{p.get('ip', host)}:{p['port']}", extra_data=p))
                 if p["port"] in [21, 22, 23, 3389, 5900, 3306, 445]:
@@ -80,10 +75,10 @@ async def run_discovery_scan(db: Session, scan_id: int):
                     ))
             db.commit()
         except Exception as e:
-            print(f"Port error: {e}")
+            print("Port error:", e)
 
-        # 3. Tech detect
-        scan.progress = 24
+        # 3. Tech
+        scan.progress = 22
         db.commit()
         try:
             tech = await detect_technologies(target)
@@ -95,56 +90,48 @@ async def run_discovery_scan(db: Session, scan_id: int):
                     description=", ".join(tech["technologies"]),
                     severity=Severity.INFO.value, category="Technology Fingerprint",
                     evidence=str(tech.get("server")), location=tech.get("final_url") or target,
-                    remediation="Keep software updated and minimize version disclosure."
+                    remediation="Keep software updated."
                 ))
             db.commit()
         except Exception as e:
-            print(f"Tech error: {e}")
+            print("Tech error:", e)
 
-        # 4. Crawling
-        scan.progress = 38
+        # 4. Crawl
+        scan.progress = 35
         db.commit()
         pages = []
         try:
-            pages = await crawl_site(target, max_pages=18, max_depth=2)
+            pages = await crawl_site(target, max_pages=20, max_depth=2)
             for page in pages:
                 if page.get("error"):
                     continue
                 db.add(Asset(scan_id=scan.id, asset_type="page", value=page.get("url"),
-                             extra_data={
-                                 "status_code": page.get("status_code"),
-                                 "title": page.get("title"),
-                                 "has_forms": page.get("has_forms"),
-                                 "interesting": page.get("interesting")
-                             }))
+                             extra_data={"status_code": page.get("status_code"),
+                                         "title": page.get("title"),
+                                         "has_forms": page.get("has_forms")}))
             db.commit()
         except Exception as e:
-            print(f"Crawl error: {e}")
+            print("Crawl error:", e)
 
         # 5. Directory discovery
-        scan.progress = 52
+        scan.progress = 48
         db.commit()
         try:
-            dirs = await directory_discovery(target)
-            discovered_paths = dirs
-            for d in dirs:
+            discovered_paths = await directory_discovery(target)
+            for d in discovered_paths:
                 db.add(Asset(scan_id=scan.id, asset_type="path", value=d.get("url"), extra_data=d))
             db.commit()
         except Exception as e:
-            print(f"Dir discovery error: {e}")
+            print("Dir error:", e)
 
-        # 6. Secrets + content analysis
-        scan.progress = 68
+        # 6. Secrets analysis on pages
+        scan.progress = 62
         db.commit()
-        urls_to_analyze = [target]
-        for p in pages[:6]:
-            u = p.get("url")
-            if u and u not in urls_to_analyze:
-                urls_to_analyze.append(u)
+        urls = [target] + [p.get("url") for p in pages[:7] if p.get("url")]
+        headers_ua = {"User-Agent": "HelixAudit/0.5 (Authorized Security Scanner)"}
 
-        headers = {"User-Agent": "HelixAudit/0.4 (Authorized Security Scanner)"}
-        async with httpx.AsyncClient(follow_redirects=True, timeout=12.0, verify=False, headers=headers) as client:
-            for i, url in enumerate(urls_to_analyze):
+        async with httpx.AsyncClient(follow_redirects=True, timeout=12.0, verify=False, headers=headers_ua) as client:
+            for i, url in enumerate(dict.fromkeys(urls)):  # unique preserve order
                 try:
                     data = await fetch_and_analyze(client, url)
                     if not data:
@@ -153,50 +140,48 @@ async def run_discovery_scan(db: Session, scan_id: int):
                         main_headers = data.get("headers") or {}
                         main_body = data.get("text") or ""
 
-                    # Secrets
-                    secrets = find_secrets_in_text(data.get("text") or "", source=url)
-                    for sec in secrets:
+                    for sec in find_secrets_in_text(data.get("text") or "", source=url):
                         sev = Severity.CRITICAL.value if sec.get("confidence", 0) >= 0.8 else Severity.HIGH.value
                         db.add(Finding(
                             scan_id=scan.id,
                             title=f"Potential {sec['type']} Found",
-                            description=f"Possible {sec['type']} detected. Confidence: {sec.get('confidence')}",
+                            description=f"Possible secret detected (confidence {sec.get('confidence')})",
                             severity=sev,
-                            category="A04:2025 Cryptographic Failures / Sensitive Data Exposure",
-                            evidence=f"Match: {sec['evidence']}\nSource: {sec['source']}",
+                            category="Sensitive Data Exposure",
+                            evidence=f"{sec['evidence']}\nSource: {sec['source']}",
                             location=url,
-                            remediation="Remove or rotate the exposed secret immediately. Never hardcode credentials."
+                            remediation="Rotate/remove the secret immediately. Never hardcode credentials."
                         ))
                     db.commit()
                 except Exception as e:
-                    print(f"Analysis error on {url}: {e}")
+                    print("Secrets analysis error:", e)
 
-        # 7. Phase 4 – OWASP surface checks
-        scan.progress = 85
-        db.commit()
-        try:
-            owasp_findings = run_owasp_surface_checks(
-                url=target,
-                headers=main_headers,
-                body=main_body,
-                discovered_paths=discovered_paths
-            )
-            for f in owasp_findings:
-                db.add(Finding(
-                    scan_id=scan.id,
-                    title=f["title"],
-                    description=f.get("title"),
-                    severity=_sev(f.get("severity")),
-                    category=f.get("category", "OWASP Check"),
-                    evidence=f.get("evidence"),
-                    location=f.get("location") or target,
-                    remediation=f.get("remediation")
-                ))
+            # 7. Expanded OWASP checks (Phase 4)
+            scan.progress = 80
             db.commit()
-        except Exception as e:
-            print(f"OWASP checks error: {e}")
+            try:
+                owasp = await run_full_owasp_checks(
+                    client=client,
+                    url=target,
+                    headers=main_headers,
+                    body=main_body,
+                    discovered_paths=discovered_paths
+                )
+                for f in owasp:
+                    db.add(Finding(
+                        scan_id=scan.id,
+                        title=f["title"],
+                        description=f.get("title"),
+                        severity=_sev(f.get("severity")),
+                        category=f.get("category", "OWASP Check"),
+                        evidence=f.get("evidence"),
+                        location=f.get("location") or target,
+                        remediation=f.get("remediation")
+                    ))
+                db.commit()
+            except Exception as e:
+                print("OWASP error:", e)
 
-        # Done
         scan.status = ScanStatus.COMPLETED.value
         scan.progress = 100
         scan.completed_at = datetime.utcnow()

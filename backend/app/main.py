@@ -32,7 +32,7 @@ async def root():
     return {
         "name": settings.PROJECT_NAME,
         "version": settings.VERSION,
-        "phase": "Phase 1 - Foundation + Strong Discovery",
+        "phase": "Phase 1 - Foundation + Strong Discovery (Render-friendly)",
         "message": "Authorized use only. Always obtain written permission before scanning any target.",
         "docs": "/docs",
         "features": [

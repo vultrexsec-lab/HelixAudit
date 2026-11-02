@@ -158,3 +158,23 @@ async def check_path(client: httpx.AsyncClient, url: str, path: str) -> Dict[str
         }
     except Exception:
         return None
+
+
+# ===== Phase 3 helpers =====
+async def fetch_and_analyze(client, url: str) -> Dict[str, Any] | None:
+    """Fetch page and return text for secrets analysis."""
+    try:
+        resp = await client.get(url, timeout=12.0)
+        content_type = resp.headers.get("content-type", "")
+        text = ""
+        if any(x in content_type for x in ["text", "json", "javascript", "xml"]):
+            text = resp.text[:150000]
+        return {
+            "url": str(resp.url),
+            "status_code": resp.status_code,
+            "headers": dict(resp.headers),
+            "text": text,
+            "content_type": content_type
+        }
+    except Exception as e:
+        return None

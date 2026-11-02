@@ -32,7 +32,7 @@ async def root():
     return {
         "name": settings.PROJECT_NAME,
         "version": settings.VERSION,
-        "phase": "Phase 2 - Discovery + Deep Crawling",
+        "phase": "Phase 3 - Deep Analysis + Secrets Detection",
         "message": "Authorized use only. Always obtain written permission before scanning any target.",
         "docs": "/docs",
         "features": [
@@ -47,4 +47,4 @@ async def root():
 
 @app.get("/health")
 async def health():
-    return {"status": "healthy", "phase": "2"}
+    return {"status": "healthy", "phase": "3"}

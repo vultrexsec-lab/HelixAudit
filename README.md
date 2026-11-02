@@ -1,49 +1,65 @@
 # HelixAudit
 
-**HelixAudit** is a professional, sequential, authorized penetration testing and vulnerability assessment platform.
+**Professional Authorized Security Assessment Platform**
 
-> **⚠️ STRICTLY FOR AUTHORIZED USE ONLY**  
-> Only scan systems you own or have explicit written permission (Rules of Engagement) to test. Unauthorized testing is illegal.
+HelixAudit helps security professionals perform structured, sequential reconnaissance and surface analysis on targets they are authorized to test.
 
-## Current Status: Phase 1 Complete
+> ⚠️ **AUTHORIZED USE ONLY**  
+> Only scan systems you own or have explicit written permission (Rules of Engagement) to test. Unauthorized scanning is illegal.
 
-**Phase 1 – Foundation + Strong Discovery** includes:
+## Current Version: 0.6.0 (Phase 6)
 
-- Project & Scan management
+### Features
+
+- Project & Engagement management
 - Subdomain enumeration
-- Port & Service scanning (Nmap)
-- Basic Technology detection
-- Findings storage with evidence
-- Clean REST API
-
-### API Documentation
-Once running: http://localhost:8000/docs
+- Port & Service scanning (Nmap + TCP fallback)
+- Deep crawling & content discovery
+- Secrets / API key / password pattern detection (with evidence)
+- OWASP Top 10 (2025) oriented surface checks
+- Finding lifecycle (new → confirmed → false_positive → fixed → retest)
+- Professional HTML report generation
+- Clean REST API + simple web UI
 
 ### Quick Start (Local)
 
 ```bash
 cd backend
+python -m venv venv
+source venv/bin/activate   # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### Main Endpoints
+- API Docs: http://localhost:8000/docs
+- Health: http://localhost:8000/health
 
-- `POST /api/v1/projects` – Create project
-- `GET  /api/v1/projects` – List projects
-- `POST /api/v1/scans` – Start a discovery scan
-- `GET  /api/v1/scans/{id}` – Scan status
-- `GET  /api/v1/scans/{id}/assets` – Discovered assets
-- `GET  /api/v1/scans/{id}/findings` – Findings with evidence
+### Frontend
 
-## Roadmap
+Simple UI is in `/frontend`. Point `API_BASE` inside `index.html` to your backend URL, then host on Vercel or any static host.
 
-- **Phase 1**: Foundation + Strong Discovery ✅
-- **Phase 2**: Deep Crawling & Content Collection
-- **Phase 3**: Deep Analysis + Secrets/Password Leak Detection
-- **Phase 4**: OWASP Top 10 + Authenticated Scanning
-- **Phase 5**: Professional Reporting & Finding Lifecycle
-- **Phase 6**: Hardening, Polish & Deployment
+### Important API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/v1/projects` | Create project |
+| POST | `/api/v1/scans` | Start scan |
+| GET | `/api/v1/scans/{id}` | Scan status |
+| GET | `/api/v1/scans/{id}/findings` | List findings |
+| GET | `/api/v1/scans/{id}/assets` | List assets |
+| PATCH | `/api/v1/findings/{id}` | Update finding status |
+| GET | `/api/v1/scans/{id}/report` | HTML report |
+
+### Production Notes
+
+- Set `SECRET_KEY` and optionally `API_KEY` in environment
+- Restrict `CORS_ORIGINS` to your frontend domain
+- Use PostgreSQL for multi-instance deployments
+- Always keep scope & written authorization
+
+### Disclaimer
+
+HelixAudit is a security assessment aid. It does not replace manual expert testing. Users are solely responsible for obtaining proper authorization and complying with all applicable laws.
 
 ## License
 Private – All rights reserved.

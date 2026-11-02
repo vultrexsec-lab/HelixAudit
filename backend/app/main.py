@@ -1,16 +1,21 @@
 """
-HelixAudit - Phase 1
-Professional Authorized Penetration Testing Dashboard
+HelixAudit - Professional Authorized Security Scanner
+Phase 6: Hardened & Production Ready
 """
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from .api.routes import router
 from .core.config import settings
+from .core.security import verify_api_key
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    description="Sequential, professional, authorized vulnerability assessment platform. Phase 1: Foundation + Strong Discovery",
+    description=(
+        "Sequential, professional, authorized vulnerability assessment platform.\n\n"
+        "⚠️ AUTHORIZED USE ONLY. Only scan systems you own or have written permission to test."
+    ),
     version=settings.VERSION,
     docs_url="/docs",
     redoc_url="/redoc",
@@ -18,12 +23,13 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.cors_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# All API routes (optional API key protection via dependency where needed)
 app.include_router(router, prefix=settings.API_V1_STR)
 
 
@@ -32,19 +38,31 @@ async def root():
     return {
         "name": settings.PROJECT_NAME,
         "version": settings.VERSION,
-        "phase": "Phase 5 - Reporting + Finding Lifecycle",
-        "message": "Authorized use only. Always obtain written permission before scanning any target.",
+        "phase": "Phase 6 - Hardened & Production Ready",
+        "message": "Authorized use only. Always obtain written permission before scanning.",
         "docs": "/docs",
         "features": [
-            "Project Management",
+            "Project & Scan Management",
             "Subdomain Enumeration",
-            "Port & Service Scanning (Nmap)",
-            "Basic Technology Detection",
-            "Findings with Evidence"
+            "Port & Service Scanning",
+            "Deep Crawling & Content Discovery",
+            "Secrets / Sensitive Data Detection",
+            "OWASP Top 10 Oriented Checks",
+            "Finding Lifecycle Management",
+            "Professional HTML Reports"
         ]
     }
 
 
 @app.get("/health")
 async def health():
-    return {"status": "healthy", "phase": "5"}
+    return {
+        "status": "healthy",
+        "version": settings.VERSION,
+        "phase": "6"
+    }
+
+
+@app.get("/version")
+async def version():
+    return {"version": settings.VERSION, "name": settings.PROJECT_NAME}

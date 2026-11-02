@@ -1,44 +1,49 @@
 # HelixAudit
 
-**HelixAudit** is a professional, sequential, authorized penetration testing and vulnerability assessment dashboard.
-
-It follows a structured, phase-by-phase approach inspired by professional methodologies (PTES, OWASP Testing Guide) and Six Sigma-style process discipline:
-
-1. Reconnaissance & Discovery  
-2. Port & Service Scanning  
-3. OWASP Top 10 (2025) Analysis  
-4. Vulnerability Impact Assessment  
-5. Controlled Proof-of-Concept (within Rules of Engagement)  
-6. Professional Client Reporting  
+**HelixAudit** is a professional, sequential, authorized penetration testing and vulnerability assessment platform.
 
 > **⚠️ STRICTLY FOR AUTHORIZED USE ONLY**  
-> This tool must only be used against systems you own or have explicit written permission (Rules of Engagement) to test. Unauthorized scanning or testing is illegal.
+> Only scan systems you own or have explicit written permission (Rules of Engagement) to test. Unauthorized testing is illegal.
 
-## Project Status
+## Current Status: Phase 1 Complete
 
-- Phase 0: Foundation & Planning → In Progress
-- Current focus: Core structure, ethical framework, basic backend
+**Phase 1 – Foundation + Strong Discovery** includes:
 
-## Tech Stack (Planned)
+- Project & Scan management
+- Subdomain enumeration
+- Port & Service scanning (Nmap)
+- Basic Technology detection
+- Findings storage with evidence
+- Clean REST API
 
-- Backend: Python + FastAPI
-- Frontend: React / Next.js (Vercel)
-- Scanners: Nmap, OWASP ZAP, Nuclei, etc. (integrated)
-- Database: SQLite / PostgreSQL
-- Reports: PDF + HTML professional templates
+### API Documentation
+Once running: http://localhost:8000/docs
 
-## Ethical Guidelines
+### Quick Start (Local)
 
-- Always obtain written authorization before any scan
-- Respect scope and Rules of Engagement
-- Never perform destructive testing unless explicitly allowed
-- Protect client data and findings
-- Generate clear, actionable, professional reports
+```bash
+cd backend
+pip install -r requirements.txt
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+### Main Endpoints
+
+- `POST /api/v1/projects` – Create project
+- `GET  /api/v1/projects` – List projects
+- `POST /api/v1/scans` – Start a discovery scan
+- `GET  /api/v1/scans/{id}` – Scan status
+- `GET  /api/v1/scans/{id}/assets` – Discovered assets
+- `GET  /api/v1/scans/{id}/findings` – Findings with evidence
+
+## Roadmap
+
+- **Phase 1**: Foundation + Strong Discovery ✅
+- **Phase 2**: Deep Crawling & Content Collection
+- **Phase 3**: Deep Analysis + Secrets/Password Leak Detection
+- **Phase 4**: OWASP Top 10 + Authenticated Scanning
+- **Phase 5**: Professional Reporting & Finding Lifecycle
+- **Phase 6**: Hardening, Polish & Deployment
 
 ## License
-
-Proprietary / Private for now. All rights reserved by the project owner.
-
----
-
-Built for professional ethical security testing.
+Private – All rights reserved.

@@ -1,19 +1,20 @@
-# HelixAudit Phases
+# HelixAudit
 
-## Phases 1–8 ✅
-Core discovery, crawling, secrets, OWASP surface, reporting, export
+## v1.0.0-rc1
 
-## Phase 9 ✅ (Current) — Closer to complete product
-- Authenticated scanning foundation (form login + session crawl)
-- Deeper active checks (CORS, HTTP methods, sensitive files)
-- Full dashboard UI: New Scan, Projects, Scan History
-- Auth credentials optional on scan
-- Password cleared from config after scan
-- Version 0.9.0
+### Implemented
+- Multi-user register/login (JWT)
+- Scheduled scans (interval-based, in-process worker)
+- Background scan execution
+- SQLi/XSS *detection probes* (not full exploit engine)
+- PDF reports (reportlab)
+- HTML + JSON export
+- Authenticated scanning foundation
+- Dashboard UI with projects/history
+- Finding lifecycle
 
-### Still not "100% commercial PT platform"
-- Full exploit-level injection testing
-- Robust multi-user accounts
-- Job queue workers
-- Screenshot evidence capture
-- Perfect PDF engine
+### Honest limitations
+- Not SQLMap/Burp-level exploitation
+- Scheduler is in-process (not distributed Celery/Redis)
+- Screenshots not included (Playwright too heavy for free tier)
+- Auth on API is optional for scan routes (backward compatible)

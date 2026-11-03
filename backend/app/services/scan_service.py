@@ -12,6 +12,7 @@ from ..scanners.crawler import crawl_site, directory_discovery, fetch_and_analyz
 from ..scanners.secrets import find_secrets_in_text
 from ..scanners.owasp_checks import run_full_owasp_checks
 from ..scanners.active_checks import run_active_checks
+from ..scanners.injection import run_injection_detection
 from ..scanners.auth_scan import attempt_form_login, authenticated_crawl
 from urllib.parse import urlparse
 import httpx
@@ -190,6 +191,22 @@ async def run_discovery_scan(db: Session, scan_id: int):
                 db.commit()
             except Exception as e:
                 print("Active checks error:", e)
+
+            # 8b. Injection detection (safe probes)
+            scan.progress = 78
+            db.commit()
+            try:
+                inj = await run_injection_detection(client, target)
+                for f in inj:
+                    db.add(Finding(
+                        scan_id=scan.id, title=f["title"], description=f.get("title"),
+                        severity=_sev(f.get("severity")), category=f.get("category", "Injection"),
+                        evidence=f.get("evidence"), location=f.get("location") or target,
+                        remediation=f.get("remediation")
+                    ))
+                db.commit()
+            except Exception as e:
+                print("Injection detection error:", e)
 
         # 9. Authenticated scanning (if credentials provided)
         scan.progress = 82

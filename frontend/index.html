@@ -55,13 +55,25 @@
       <button onclick="showView('history', this); loadHistory()">Scan History</button>
     </div>
     <div style="margin-top:2rem" class="muted">
-      <div class="badge">v0.9</div>
+      <div class="badge">v1.0-rc1</div>
       <div style="margin-top:0.5rem">Authorized use only</div>
     </div>
   </aside>
 
   <main class="main">
     <div class="warn">⚠️ Only scan targets you own or have written permission to test.</div>
+
+    <div class="card" id="authCard">
+      <h2>Account (Multi-user)</h2>
+      <div class="row">
+        <div><label>Email</label><input id="loginEmail" type="email" placeholder="you@company.com" /></div>
+        <div><label>Password</label><input id="loginPass" type="password" placeholder="min 8 chars" /></div>
+      </div>
+      <button class="btn btn-secondary btn-sm" onclick="doLogin()">Login</button>
+      <button class="btn btn-secondary btn-sm" onclick="doRegister()">Register</button>
+      <span id="authStatus" class="muted" style="margin-left:0.75rem"></span>
+    </div>
+
 
     <!-- NEW SCAN -->
     <section id="view-scan">
@@ -105,6 +117,7 @@
         <div id="scanMeta" class="muted"></div>
         <div style="margin-top:0.8rem" class="hidden" id="exportWrap">
           <a id="reportLink" class="btn btn-secondary btn-sm" target="_blank" style="text-decoration:none">HTML Report</a>
+          <a id="pdfLink" class="btn btn-secondary btn-sm" target="_blank" style="text-decoration:none;margin-left:0.4rem">PDF</a>
           <a id="jsonLink" class="btn btn-secondary btn-sm" target="_blank" style="text-decoration:none;margin-left:0.4rem">JSON Export</a>
         </div>
       </div>
@@ -140,9 +153,38 @@ let currentScanId = null, pollTimer = null, allFindings = [];
 
 function headers() {
   const h = {"Content-Type":"application/json"};
-  const k = document.getElementById("apiKey").value.trim();
+  const k = document.getElementById("apiKey") ? document.getElementById("apiKey").value.trim() : "";
   if (k) h["X-API-Key"] = k;
+  const t = localStorage.getItem("helix_token");
+  if (t) h["Authorization"] = "Bearer " + t;
   return h;
+}
+
+async function doLogin() {
+  const email = document.getElementById("loginEmail").value.trim();
+  const password = document.getElementById("loginPass").value;
+  const body = new URLSearchParams({username: email, password});
+  const res = await fetch(API_BASE + "/auth/login", {
+    method: "POST",
+    headers: {"Content-Type": "application/x-www-form-urlencoded"},
+    body
+  });
+  if (!res.ok) { alert("Login failed"); return; }
+  const data = await res.json();
+  localStorage.setItem("helix_token", data.access_token);
+  document.getElementById("authStatus").textContent = "Logged in as " + data.user.email;
+}
+
+async function doRegister() {
+  const email = document.getElementById("loginEmail").value.trim();
+  const password = document.getElementById("loginPass").value;
+  const res = await fetch(API_BASE + "/auth/register", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({email, password, full_name: email.split("@")[0]})
+  });
+  if (!res.ok) { alert(await res.text()); return; }
+  alert("Registered — now login");
 }
 
 function showView(name, btn) {
@@ -214,6 +256,7 @@ async function pollScan() {
       if (scan.status === "completed") {
         document.getElementById("exportWrap").classList.remove("hidden");
         document.getElementById("reportLink").href = `${API_BASE}/scans/${currentScanId}/report`;
+        const pdf=document.getElementById("pdfLink"); if(pdf) pdf.href=`${API_BASE}/scans/${currentScanId}/report.pdf`;
         document.getElementById("jsonLink").href = `${API_BASE}/scans/${currentScanId}/export`;
         loadFindings();
       }
@@ -314,7 +357,8 @@ async function openScan(id) {
   document.getElementById("statusCard").classList.remove("hidden");
   document.getElementById("exportWrap").classList.remove("hidden");
   document.getElementById("reportLink").href = `${API_BASE}/scans/${id}/report`;
-  document.getElementById("jsonLink").href = `${API_BASE}/scans/${id}/export`;
+  const pdf=document.getElementById("pdfLink"); if(pdf) pdf.href=`${API_BASE}/scans/${currentScanId}/report.pdf`;
+        document.getElementById("jsonLink").href = `${API_BASE}/scans/${id}/export`;
   const res = await fetch(`${API_BASE}/scans/${id}`, {headers: headers()});
   updateStatus(await res.json());
   loadFindings();

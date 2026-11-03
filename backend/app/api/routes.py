@@ -354,3 +354,21 @@ def export_scan_json(scan_id: int, db: Session = Depends(get_db)):
             for a in assets
         ],
     }
+
+
+@router.get("/scans/{scan_id}/report.pdf")
+def generate_pdf_report(scan_id: int, db: Session = Depends(get_db)):
+    from fastapi.responses import Response
+    from ..services.pdf_report import build_pdf_report
+
+    data = _build_report_data(db, scan_id)
+    if not data:
+        raise HTTPException(status_code=404, detail="Scan not found")
+    pdf_bytes = build_pdf_report(
+        data["scan"], data["project"], data["findings"], data["assets"], data["counts"]
+    )
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=helixaudit-scan-{scan_id}.pdf"},
+    )

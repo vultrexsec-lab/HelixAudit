@@ -3,103 +3,238 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>HelixAudit Dashboard</title>
+  <title>HelixAudit</title>
   <style>
     :root {
-      --bg:#0b1220; --panel:#111827; --card:#1e293b; --border:#334155;
-      --text:#e2e8f0; --muted:#94a3b8; --accent:#3b82f6; --accent2:#8b5cf6;
-      --ok:#22c55e; --warn:#f59e0b; --bad:#ef4444;
+      --bg: #070b14;
+      --panel: #0d1424;
+      --card: #121a2b;
+      --card2: #182234;
+      --border: rgba(148,163,184,0.14);
+      --text: #e8eef9;
+      --muted: #8b9bb4;
+      --accent: #3b82f6;
+      --accent2: #8b5cf6;
+      --ok: #22c55e;
+      --warn: #f59e0b;
+      --bad: #ef4444;
+      --shadow: 0 10px 40px rgba(0,0,0,0.35);
+      --radius: 16px;
     }
-    *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
-    .layout{display:grid;grid-template-columns:240px 1fr;min-height:100vh}
-    .sidebar{background:var(--panel);border-right:1px solid var(--border);padding:1.25rem}
-    .logo{font-weight:800;font-size:1.3rem;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:1.5rem}
-    .nav button{width:100%;text-align:left;background:transparent;border:none;color:var(--muted);padding:0.7rem 0.8rem;border-radius:8px;cursor:pointer;margin-bottom:0.3rem}
-    .nav button.active,.nav button:hover{background:#1e293b;color:#fff}
-    .main{padding:1.5rem}
-    .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.25rem;margin-bottom:1rem}
-    h2{font-size:1.1rem;margin-bottom:0.9rem}
-    label{display:block;font-size:0.8rem;color:var(--muted);margin-bottom:0.3rem}
-    input,select{width:100%;padding:0.65rem 0.8rem;border-radius:8px;border:1px solid var(--border);background:#0f172a;color:var(--text);margin-bottom:0.8rem}
-    .row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:0.8rem}
-    .btn{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border:none;padding:0.7rem 1.2rem;border-radius:8px;font-weight:600;cursor:pointer}
-    .btn:disabled{opacity:.5;cursor:not-allowed}
-    .btn-secondary{background:#334155}
-    .btn-sm{padding:0.35rem 0.65rem;font-size:0.8rem}
-    table{width:100%;border-collapse:collapse;font-size:0.88rem}
-    th,td{padding:0.55rem 0.6rem;border-bottom:1px solid var(--border);text-align:left;vertical-align:top}
-    th{color:var(--muted);font-weight:500}
-    .sev{font-size:0.7rem;padding:0.12rem 0.4rem;border-radius:4px;font-weight:700;text-transform:uppercase}
-    .sev-critical{background:#7f1d1d;color:#fecaca}
-    .sev-high{background:#9a3412;color:#fed7aa}
-    .sev-medium{background:#854d0e;color:#fde68a}
-    .sev-low{background:#1e3a5f;color:#bfdbfe}
-    .sev-info{background:#1e293b;color:#94a3b8}
-    .warn{background:#422006;border:1px solid #b45309;color:#fde68a;padding:0.75rem 1rem;border-radius:8px;font-size:0.85rem;margin-bottom:1rem}
-    .muted{color:var(--muted);font-size:0.85rem}
-    .progress{height:8px;background:#0f172a;border-radius:4px;overflow:hidden;margin:0.6rem 0}
-    .bar{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));width:0%;transition:width .3s}
-    .hidden{display:none}
-    .evidence{font-size:0.78rem;color:var(--muted);word-break:break-all}
-    .badge{display:inline-block;background:#1e3a5f;color:#93c5fd;font-size:0.72rem;padding:0.15rem 0.5rem;border-radius:999px}
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background:
+        radial-gradient(1200px 600px at 10% -10%, rgba(59,130,246,0.18), transparent 50%),
+        radial-gradient(900px 500px at 100% 0%, rgba(139,92,246,0.14), transparent 45%),
+        var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    .layout { display: grid; grid-template-columns: 260px 1fr; min-height: 100vh; }
+    .sidebar {
+      background: linear-gradient(180deg, rgba(13,20,36,0.98), rgba(7,11,20,0.98));
+      border-right: 1px solid var(--border);
+      padding: 1.5rem 1.1rem;
+      position: sticky; top: 0; height: 100vh;
+    }
+    .logo {
+      font-weight: 800; font-size: 1.45rem; letter-spacing: -0.03em;
+      background: linear-gradient(135deg, #60a5fa, #a78bfa 55%, #c4b5fd);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      margin-bottom: 0.25rem;
+    }
+    .logo-sub { color: var(--muted); font-size: 0.78rem; margin-bottom: 1.75rem; }
+    .nav { display: flex; flex-direction: column; gap: 0.35rem; }
+    .nav button {
+      width: 100%; text-align: left; background: transparent; border: 1px solid transparent;
+      color: var(--muted); padding: 0.75rem 0.9rem; border-radius: 12px; cursor: pointer;
+      font-size: 0.92rem; transition: 0.15s ease;
+    }
+    .nav button:hover { background: rgba(255,255,255,0.04); color: #fff; }
+    .nav button.active {
+      background: linear-gradient(135deg, rgba(59,130,246,0.2), rgba(139,92,246,0.16));
+      border-color: rgba(99,102,241,0.35); color: #fff; font-weight: 600;
+    }
+    .side-foot { margin-top: auto; padding-top: 2rem; color: var(--muted); font-size: 0.78rem; }
+    .badge {
+      display: inline-flex; align-items: center; gap: 0.35rem;
+      background: rgba(59,130,246,0.15); color: #93c5fd; border: 1px solid rgba(59,130,246,0.25);
+      font-size: 0.72rem; padding: 0.2rem 0.55rem; border-radius: 999px; font-weight: 600;
+    }
+    .main { padding: 1.5rem 1.75rem 2.5rem; max-width: 1200px; }
+    .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; gap: 1rem; flex-wrap: wrap; }
+    .topbar h1 { font-size: 1.35rem; font-weight: 700; letter-spacing: -0.02em; }
+    .warn {
+      background: linear-gradient(90deg, rgba(245,158,11,0.12), rgba(245,158,11,0.05));
+      border: 1px solid rgba(245,158,11,0.35); color: #fde68a;
+      padding: 0.8rem 1rem; border-radius: 12px; font-size: 0.85rem; margin-bottom: 1.15rem;
+    }
+    .card {
+      background: linear-gradient(180deg, rgba(24,34,52,0.9), rgba(18,26,43,0.95));
+      border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 1.25rem 1.35rem; margin-bottom: 1rem; box-shadow: var(--shadow);
+    }
+    .card h2 {
+      font-size: 0.95rem; font-weight: 700; margin-bottom: 1rem;
+      display: flex; align-items: center; gap: 0.5rem;
+    }
+    .card h2::before {
+      content: ""; width: 6px; height: 6px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+    }
+    label { display: block; font-size: 0.78rem; color: var(--muted); margin-bottom: 0.35rem; font-weight: 500; }
+    input, select {
+      width: 100%; padding: 0.7rem 0.85rem; border-radius: 10px;
+      border: 1px solid var(--border); background: rgba(7,11,20,0.75); color: var(--text);
+      margin-bottom: 0.85rem; font-size: 0.9rem; outline: none; transition: border-color .15s;
+    }
+    input:focus, select:focus { border-color: rgba(59,130,246,0.55); box-shadow: 0 0 0 3px rgba(59,130,246,0.12); }
+    .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.85rem; }
+    .btn {
+      background: linear-gradient(135deg, #3b82f6, #7c3aed);
+      color: #fff; border: none; padding: 0.75rem 1.25rem; border-radius: 11px;
+      font-weight: 650; cursor: pointer; font-size: 0.9rem;
+      box-shadow: 0 8px 24px rgba(59,130,246,0.25); transition: transform .12s, opacity .12s;
+    }
+    .btn:hover { transform: translateY(-1px); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .btn-secondary {
+      background: rgba(255,255,255,0.06); border: 1px solid var(--border);
+      box-shadow: none; color: var(--text);
+    }
+    .btn-sm { padding: 0.4rem 0.75rem; font-size: 0.8rem; border-radius: 8px; }
+    .btn-row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+    .muted { color: var(--muted); font-size: 0.85rem; }
+    .hidden { display: none !important; }
+    .progress {
+      height: 10px; background: rgba(255,255,255,0.06); border-radius: 999px;
+      overflow: hidden; margin: 0.75rem 0;
+    }
+    .bar {
+      height: 100%; width: 0%;
+      background: linear-gradient(90deg, #3b82f6, #8b5cf6, #22d3ee);
+      transition: width .35s ease; border-radius: 999px;
+    }
+    .stats {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+      gap: 0.65rem; margin: 0.85rem 0 0.25rem;
+    }
+    .stat {
+      background: rgba(7,11,20,0.55); border: 1px solid var(--border);
+      border-radius: 12px; padding: 0.75rem; text-align: center;
+    }
+    .stat strong { display: block; font-size: 1.25rem; font-weight: 750; }
+    .stat span { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+    th, td { padding: 0.7rem 0.6rem; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+    th { color: var(--muted); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; }
+    tr:hover td { background: rgba(255,255,255,0.02); }
+    .sev {
+      font-size: 0.68rem; padding: 0.18rem 0.45rem; border-radius: 6px;
+      font-weight: 750; text-transform: uppercase; display: inline-block; white-space: nowrap;
+    }
+    .sev-critical { background: rgba(239,68,68,0.2); color: #fecaca; border: 1px solid rgba(239,68,68,0.35); }
+    .sev-high { background: rgba(249,115,22,0.18); color: #fed7aa; border: 1px solid rgba(249,115,22,0.3); }
+    .sev-medium { background: rgba(245,158,11,0.16); color: #fde68a; border: 1px solid rgba(245,158,11,0.3); }
+    .sev-low { background: rgba(59,130,246,0.15); color: #bfdbfe; border: 1px solid rgba(59,130,246,0.28); }
+    .sev-info { background: rgba(148,163,184,0.12); color: #cbd5e1; border: 1px solid rgba(148,163,184,0.2); }
+    .evidence { font-size: 0.78rem; color: var(--muted); word-break: break-word; margin-top: 0.2rem; line-height: 1.35; }
+    .tabs { display: flex; gap: 0.4rem; margin-bottom: 0.9rem; flex-wrap: wrap; }
+    .tab {
+      padding: 0.4rem 0.85rem; border-radius: 999px; border: 1px solid var(--border);
+      background: transparent; color: var(--muted); cursor: pointer; font-size: 0.8rem;
+    }
+    .tab.active { background: rgba(59,130,246,0.18); color: #fff; border-color: rgba(59,130,246,0.4); }
+    .empty {
+      text-align: center; padding: 2rem 1rem; color: var(--muted);
+      border: 1px dashed var(--border); border-radius: 12px;
+    }
+    .status-pill {
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      padding: 0.3rem 0.65rem; border-radius: 999px; font-size: 0.8rem; font-weight: 600;
+      background: rgba(255,255,255,0.05); border: 1px solid var(--border);
+    }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+    .dot.running { background: var(--warn); box-shadow: 0 0 0 4px rgba(245,158,11,0.15); animation: pulse 1s infinite; }
+    .dot.completed { background: var(--ok); box-shadow: 0 0 0 4px rgba(34,197,94,0.12); }
+    .dot.failed { background: var(--bad); }
+    @keyframes pulse { 50% { opacity: 0.45; } }
+    @media (max-width: 860px) {
+      .layout { grid-template-columns: 1fr; }
+      .sidebar { position: relative; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
+      .nav { flex-direction: row; flex-wrap: wrap; }
+      .nav button { width: auto; }
+    }
   </style>
 </head>
 <body>
 <div class="layout">
   <aside class="sidebar">
     <div class="logo">HelixAudit</div>
-    <div class="nav">
-      <button class="active" onclick="showView('scan', this)">New Scan</button>
-      <button onclick="showView('projects', this); loadProjects()">Projects</button>
-      <button onclick="showView('history', this); loadHistory()">Scan History</button>
-    </div>
-    <div style="margin-top:2rem" class="muted">
-      <div class="badge">v1.0-rc1</div>
-      <div style="margin-top:0.5rem">Authorized use only</div>
+    <div class="logo-sub">Authorized security assessments</div>
+    <nav class="nav">
+      <button class="active" id="nav-scan" onclick="showView('scan')">New Scan</button>
+      <button id="nav-projects" onclick="showView('projects')">Projects</button>
+      <button id="nav-history" onclick="showView('history')">Scan History</button>
+    </nav>
+    <div class="side-foot">
+      <span class="badge">v1.2</span>
+      <div style="margin-top:0.55rem">Use only with written permission.</div>
     </div>
   </aside>
 
   <main class="main">
-    <div class="warn">⚠️ Only scan targets you own or have written permission to test.</div>
-
-    <div class="card" id="authCard">
-      <h2>Account (Multi-user)</h2>
-      <div class="row">
-        <div><label>Email</label><input id="loginEmail" type="email" placeholder="you@company.com" /></div>
-        <div><label>Password</label><input id="loginPass" type="password" placeholder="min 8 chars" /></div>
-      </div>
-      <button class="btn btn-secondary btn-sm" onclick="doLogin()">Login</button>
-      <button class="btn btn-secondary btn-sm" onclick="doRegister()">Register</button>
-      <span id="authStatus" class="muted" style="margin-left:0.75rem"></span>
+    <div class="topbar">
+      <h1 id="pageTitle">New Scan</h1>
+      <div class="muted" id="authStatus">Not logged in</div>
     </div>
 
+    <div class="warn">Only scan targets you own or have explicit written authorization to test.</div>
 
-    <!-- NEW SCAN -->
+    <!-- SCAN VIEW -->
     <section id="view-scan">
       <div class="card">
-        <h2>New Assessment</h2>
+        <h2>Account</h2>
+        <div class="row">
+          <div>
+            <label>Email</label>
+            <input id="loginEmail" type="email" placeholder="you@company.com" />
+          </div>
+          <div>
+            <label>Password</label>
+            <input id="loginPass" type="password" placeholder="min 8 characters" />
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-secondary btn-sm" onclick="doLogin()">Login</button>
+          <button class="btn btn-secondary btn-sm" onclick="doRegister()">Register</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Start assessment</h2>
         <div class="row">
           <div>
             <label>Target URL / Domain *</label>
             <input id="target" placeholder="https://example.com" />
           </div>
           <div>
-            <label>Project Name</label>
+            <label>Project name</label>
             <input id="projectName" value="Quick Scan" />
           </div>
           <div>
-            <label>API Key (optional)</label>
+            <label>API key (optional)</label>
             <input id="apiKey" type="password" placeholder="X-API-Key if required" />
           </div>
         </div>
         <div class="row">
           <div>
-            <label>Auth Username (optional)</label>
+            <label>Auth username (optional)</label>
             <input id="username" placeholder="For authenticated scan" />
           </div>
           <div>
-            <label>Auth Password (optional)</label>
+            <label>Auth password (optional)</label>
             <input id="password" type="password" placeholder="Used only for this scan" />
           </div>
           <div>
@@ -111,20 +246,26 @@
       </div>
 
       <div class="card hidden" id="statusCard">
-        <h2>Scan Status</h2>
-        <div id="statusText" class="muted">—</div>
+        <h2>Scan status</h2>
+        <div class="status-pill"><span class="dot" id="statusDot"></span><span id="statusText">—</span></div>
         <div class="progress"><div class="bar" id="progressFill"></div></div>
-        <div id="scanMeta" class="muted"></div>
-        <div style="margin-top:0.8rem" class="hidden" id="exportWrap">
-          <a id="reportLink" class="btn btn-secondary btn-sm" target="_blank" style="text-decoration:none">HTML Report</a>
-          <a id="pdfLink" class="btn btn-secondary btn-sm" target="_blank" style="text-decoration:none;margin-left:0.4rem">PDF</a>
-          <a id="jsonLink" class="btn btn-secondary btn-sm" target="_blank" style="text-decoration:none;margin-left:0.4rem">JSON Export</a>
+        <div class="muted" id="scanMeta"></div>
+        <div class="btn-row hidden" id="exportWrap" style="margin-top:0.9rem">
+          <a id="reportLink" class="btn btn-secondary btn-sm" target="_blank" rel="noopener">HTML Report</a>
+          <a id="pdfLink" class="btn btn-secondary btn-sm" target="_blank" rel="noopener">PDF</a>
+          <a id="jsonLink" class="btn btn-secondary btn-sm" target="_blank" rel="noopener">JSON</a>
         </div>
       </div>
 
       <div class="card hidden" id="resultsCard">
-        <h2>Findings</h2>
-        <div id="findingsTable" class="muted">No data</div>
+        <h2>Results</h2>
+        <div class="stats" id="summaryStats"></div>
+        <div class="tabs">
+          <button class="tab active" data-tab="findings" onclick="switchTab('findings', this)">Findings</button>
+          <button class="tab" data-tab="assets" onclick="switchTab('assets', this)">Assets</button>
+        </div>
+        <div id="findingsPanel"><div id="findingsTable" class="empty">No findings yet</div></div>
+        <div id="assetsPanel" class="hidden"><div id="assetsTable" class="empty">No assets yet</div></div>
       </div>
     </section>
 
@@ -132,16 +273,16 @@
     <section id="view-projects" class="hidden">
       <div class="card">
         <h2>Projects</h2>
-        <div id="projectsTable" class="muted">Loading...</div>
+        <div id="projectsTable" class="empty">Loading…</div>
       </div>
     </section>
 
     <!-- HISTORY -->
     <section id="view-history" class="hidden">
       <div class="card">
-        <h2>Recent Scans</h2>
-        <div class="muted" style="margin-bottom:0.8rem">Select a project first or view scans via project list.</div>
-        <div id="historyTable" class="muted">Open Projects and click a project to load its scans, or run a new scan.</div>
+        <h2>Scan history</h2>
+        <p class="muted" style="margin-bottom:0.8rem">Open a project and click Scans, or load findings from a completed scan.</p>
+        <div id="historyTable" class="empty">No scans loaded yet</div>
       </div>
     </section>
   </main>
@@ -149,24 +290,54 @@
 
 <script>
 const API_BASE = "https://helixaudit.onrender.com/api/v1";
-let currentScanId = null, pollTimer = null, allFindings = [];
+let currentScanId = null;
+let pollTimer = null;
+let allFindings = [];
+let allAssets = [];
 
 function headers() {
-  const h = {"Content-Type":"application/json"};
-  const k = document.getElementById("apiKey") ? document.getElementById("apiKey").value.trim() : "";
+  const h = { "Content-Type": "application/json" };
+  const k = (document.getElementById("apiKey")?.value || "").trim();
   if (k) h["X-API-Key"] = k;
   const t = localStorage.getItem("helix_token");
   if (t) h["Authorization"] = "Bearer " + t;
   return h;
 }
 
+function showView(name) {
+  ["scan", "projects", "history"].forEach(v => {
+    document.getElementById("view-" + v).classList.toggle("hidden", v !== name);
+    document.getElementById("nav-" + v)?.classList.toggle("active", v === name);
+  });
+  document.getElementById("pageTitle").textContent =
+    name === "scan" ? "New Scan" : name === "projects" ? "Projects" : "Scan History";
+  if (name === "projects") loadProjects();
+  if (name === "history") {
+    const el = document.getElementById("historyTable");
+    if (el && el.textContent.includes("No scans")) {
+      el.textContent = "Pick a project from Projects, then click Scans.";
+    }
+  }
+}
+
+function switchTab(name, btn) {
+  document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+  btn.classList.add("active");
+  document.getElementById("findingsPanel").classList.toggle("hidden", name !== "findings");
+  document.getElementById("assetsPanel").classList.toggle("hidden", name !== "assets");
+}
+
+function esc(s) {
+  return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
 async function doLogin() {
   const email = document.getElementById("loginEmail").value.trim();
   const password = document.getElementById("loginPass").value;
-  const body = new URLSearchParams({username: email, password});
+  const body = new URLSearchParams({ username: email, password });
   const res = await fetch(API_BASE + "/auth/login", {
     method: "POST",
-    headers: {"Content-Type": "application/x-www-form-urlencoded"},
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body
   });
   if (!res.ok) { alert("Login failed"); return; }
@@ -180,30 +351,23 @@ async function doRegister() {
   const password = document.getElementById("loginPass").value;
   const res = await fetch(API_BASE + "/auth/register", {
     method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({email, password, full_name: email.split("@")[0]})
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password, full_name: email.split("@")[0] })
   });
   if (!res.ok) { alert(await res.text()); return; }
-  alert("Registered — now login");
-}
-
-function showView(name, btn) {
-  ["scan","projects","history"].forEach(v => {
-    document.getElementById("view-"+v).classList.toggle("hidden", v !== name);
-  });
-  document.querySelectorAll(".nav button").forEach(b => b.classList.remove("active"));
-  if (btn) btn.classList.add("active");
+  alert("Registered — now click Login");
 }
 
 async function startScan() {
   const target = document.getElementById("target").value.trim();
-  if (!target) return alert("Enter target");
+  if (!target) return alert("Enter a target");
   const btn = document.getElementById("startBtn");
-  btn.disabled = true; btn.textContent = "Starting...";
+  btn.disabled = true;
+  btn.textContent = "Starting…";
 
   try {
     const projRes = await fetch(`${API_BASE}/projects`, {
-      method:"POST", headers: headers(),
+      method: "POST", headers: headers(),
       body: JSON.stringify({
         name: document.getElementById("projectName").value.trim() || "Quick Scan",
         description: "HelixAudit dashboard",
@@ -213,11 +377,7 @@ async function startScan() {
     if (!projRes.ok) throw new Error(await projRes.text());
     const project = await projRes.json();
 
-    const body = {
-      project_id: project.id,
-      target,
-      scan_type: "discovery"
-    };
+    const body = { project_id: project.id, target, scan_type: "discovery" };
     const u = document.getElementById("username").value.trim();
     const p = document.getElementById("password").value;
     const l = document.getElementById("loginUrl").value.trim();
@@ -226,7 +386,7 @@ async function startScan() {
     if (l) body.login_url = l;
 
     const scanRes = await fetch(`${API_BASE}/scans`, {
-      method:"POST", headers: headers(), body: JSON.stringify(body)
+      method: "POST", headers: headers(), body: JSON.stringify(body)
     });
     if (!scanRes.ok) throw new Error(await scanRes.text());
     const scan = await scanRes.json();
@@ -236,139 +396,228 @@ async function startScan() {
     document.getElementById("resultsCard").classList.add("hidden");
     document.getElementById("exportWrap").classList.add("hidden");
     updateStatus(scan);
-    pollTimer = setInterval(pollScan, 3000);
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = setInterval(pollScan, 2500);
+    pollScan();
   } catch (e) {
     alert("Error: " + e.message);
-    btn.disabled = false; btn.textContent = "Start Full Analysis";
+    btn.disabled = false;
+    btn.textContent = "Start Full Analysis";
   }
 }
 
 async function pollScan() {
   if (!currentScanId) return;
   try {
-    const res = await fetch(`${API_BASE}/scans/${currentScanId}`, {headers: headers()});
+    const res = await fetch(`${API_BASE}/scans/${currentScanId}`, { headers: headers() });
+    if (!res.ok) return;
     const scan = await res.json();
     updateStatus(scan);
     if (scan.status === "completed" || scan.status === "failed") {
       clearInterval(pollTimer);
-      document.getElementById("startBtn").disabled = false;
-      document.getElementById("startBtn").textContent = "Start Full Analysis";
+      pollTimer = null;
+      const btn = document.getElementById("startBtn");
+      btn.disabled = false;
+      btn.textContent = "Start Full Analysis";
       if (scan.status === "completed") {
-        document.getElementById("exportWrap").classList.remove("hidden");
-        document.getElementById("reportLink").href = `${API_BASE}/scans/${currentScanId}/report`;
-        const pdf=document.getElementById("pdfLink"); if(pdf) pdf.href=`${API_BASE}/scans/${currentScanId}/report.pdf`;
-        document.getElementById("jsonLink").href = `${API_BASE}/scans/${currentScanId}/export`;
-        loadFindings();
+        const wrap = document.getElementById("exportWrap");
+        wrap.classList.remove("hidden");
+        const base = `${API_BASE}/scans/${currentScanId}`;
+        const rl = document.getElementById("reportLink");
+        const pdf = document.getElementById("pdfLink");
+        const jl = document.getElementById("jsonLink");
+        if (rl) rl.href = base + "/report";
+        if (pdf) pdf.href = base + "/report.pdf";
+        if (jl) jl.href = base + "/export";
+        await loadResults();
+      } else {
+        document.getElementById("resultsCard").classList.remove("hidden");
+        document.getElementById("findingsTable").innerHTML =
+          `<div class="empty">Scan failed: ${esc(scan.error_message || "unknown error")}</div>`;
       }
     }
-  } catch (e) { console.error(e); }
+  } catch (e) {
+    console.error(e);
+  }
 }
 
 function updateStatus(scan) {
-  document.getElementById("statusText").textContent = `${(scan.status||"").toUpperCase()} • ${scan.progress||0}%`;
-  document.getElementById("progressFill").style.width = (scan.progress||0) + "%";
-  document.getElementById("scanMeta").textContent = `Scan #${scan.id} | ${scan.target}`;
+  const st = (scan.status || "pending").toLowerCase();
+  document.getElementById("statusText").textContent = `${st.toUpperCase()} • ${scan.progress || 0}%`;
+  document.getElementById("progressFill").style.width = (scan.progress || 0) + "%";
+  document.getElementById("scanMeta").textContent = `Scan #${scan.id} · ${scan.target}`;
+  const dot = document.getElementById("statusDot");
+  dot.className = "dot " + st;
 }
 
-async function loadFindings() {
+async function loadResults() {
   document.getElementById("resultsCard").classList.remove("hidden");
-  const res = await fetch(`${API_BASE}/scans/${currentScanId}/findings`, {headers: headers()});
-  allFindings = await res.json();
-  renderFindings();
+  document.getElementById("findingsTable").innerHTML = `<div class="empty">Loading findings…</div>`;
+  document.getElementById("assetsTable").innerHTML = `<div class="empty">Loading assets…</div>`;
+
+  try {
+    const [fRes, aRes] = await Promise.all([
+      fetch(`${API_BASE}/scans/${currentScanId}/findings`, { headers: headers() }),
+      fetch(`${API_BASE}/scans/${currentScanId}/assets`, { headers: headers() })
+    ]);
+    allFindings = fRes.ok ? await fRes.json() : [];
+    allAssets = aRes.ok ? await aRes.json() : [];
+    if (!Array.isArray(allFindings)) allFindings = [];
+    if (!Array.isArray(allAssets)) allAssets = [];
+    renderSummary();
+    renderFindings();
+    renderAssets();
+  } catch (e) {
+    document.getElementById("findingsTable").innerHTML =
+      `<div class="empty">Failed to load results: ${esc(e.message)}</div>`;
+  }
+}
+
+function renderSummary() {
+  const counts = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
+  for (const f of allFindings) {
+    const s = (f.severity || "info").toLowerCase();
+    if (counts[s] !== undefined) counts[s]++;
+  }
+  document.getElementById("summaryStats").innerHTML = `
+    <div class="stat"><strong>${counts.critical}</strong><span>Critical</span></div>
+    <div class="stat"><strong>${counts.high}</strong><span>High</span></div>
+    <div class="stat"><strong>${counts.medium}</strong><span>Medium</span></div>
+    <div class="stat"><strong>${counts.low}</strong><span>Low</span></div>
+    <div class="stat"><strong>${counts.info}</strong><span>Info</span></div>
+    <div class="stat"><strong>${allAssets.length}</strong><span>Assets</span></div>
+  `;
 }
 
 function renderFindings() {
   const el = document.getElementById("findingsTable");
-  if (!allFindings.length) { el.innerHTML = "No findings"; return; }
-  let html = `<table><thead><tr><th>Sev</th><th>Finding</th><th>Category</th><th>Status</th><th></th></tr></thead><tbody>`;
-  for (const f of allFindings) {
+  if (!allFindings.length) {
+    el.innerHTML = `<div class="empty">No findings recorded for this scan.</div>`;
+    return;
+  }
+  const order = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
+  const sorted = [...allFindings].sort((a, b) => (order[a.severity] ?? 5) - (order[b.severity] ?? 5));
+  let html = `<table><thead><tr>
+    <th>Severity</th><th>Finding</th><th>Category</th><th>Status</th><th>Action</th>
+  </tr></thead><tbody>`;
+  for (const f of sorted) {
     html += `<tr>
-      <td><span class="sev sev-${f.severity}">${f.severity}</span></td>
-      <td><strong>${esc(f.title)}</strong>
-        <div class="evidence">${esc(f.location||"")}</div>
-        <div class="evidence">${esc(String(f.evidence||"").slice(0,140))}</div>
-        <div class="evidence"><em>${esc(String(f.remediation||"").slice(0,120))}</em></div>
+      <td><span class="sev sev-${esc(f.severity)}">${esc(f.severity)}</span></td>
+      <td>
+        <strong>${esc(f.title)}</strong>
+        <div class="evidence">${esc(f.location || "")}</div>
+        <div class="evidence">${esc(String(f.evidence || "").slice(0, 180))}</div>
+        <div class="evidence"><em>${esc(String(f.remediation || "").slice(0, 140))}</em></div>
       </td>
-      <td>${esc(f.category||"")}</td>
-      <td>${esc(f.status||"new")}</td>
-      <td><select onchange="setStatus(${f.id}, this.value)">
-        <option value="">Set...</option>
-        <option value="confirmed">Confirmed</option>
-        <option value="false_positive">False Positive</option>
-        <option value="fixed">Fixed</option>
-        <option value="retest">Retest</option>
-      </select></td>
+      <td>${esc(f.category || "—")}</td>
+      <td>${esc(f.status || "new")}</td>
+      <td>
+        <select onchange="setStatus(${f.id}, this.value)">
+          <option value="">Set…</option>
+          <option value="confirmed">Confirmed</option>
+          <option value="false_positive">False Positive</option>
+          <option value="fixed">Fixed</option>
+          <option value="retest">Retest</option>
+        </select>
+      </td>
     </tr>`;
   }
-  el.innerHTML = html + "</tbody></table>";
+  el.innerHTML = html + `</tbody></table>`;
+}
+
+function renderAssets() {
+  const el = document.getElementById("assetsTable");
+  if (!allAssets.length) {
+    el.innerHTML = `<div class="empty">No assets discovered.</div>`;
+    return;
+  }
+  let html = `<table><thead><tr><th>Type</th><th>Value</th></tr></thead><tbody>`;
+  for (const a of allAssets.slice(0, 120)) {
+    html += `<tr><td>${esc(a.asset_type)}</td><td class="evidence">${esc(a.value)}</td></tr>`;
+  }
+  html += `</tbody></table>`;
+  if (allAssets.length > 120) {
+    html += `<div class="muted" style="margin-top:0.5rem">Showing 120 of ${allAssets.length}</div>`;
+  }
+  el.innerHTML = html;
 }
 
 async function setStatus(id, status) {
   if (!status) return;
   const res = await fetch(`${API_BASE}/findings/${id}`, {
-    method:"PATCH", headers: headers(), body: JSON.stringify({status})
+    method: "PATCH", headers: headers(), body: JSON.stringify({ status })
   });
-  if (res.ok) {
-    const u = await res.json();
-    const i = allFindings.findIndex(f => f.id === id);
-    if (i>=0) allFindings[i] = u;
-    renderFindings();
-  } else alert("Update failed");
+  if (!res.ok) return alert("Update failed");
+  const u = await res.json();
+  const i = allFindings.findIndex(f => f.id === id);
+  if (i >= 0) allFindings[i] = u;
+  renderFindings();
 }
 
 async function loadProjects() {
-  const res = await fetch(`${API_BASE}/projects`, {headers: headers()});
-  const projects = await res.json();
   const el = document.getElementById("projectsTable");
-  if (!projects.length) { el.innerHTML = "No projects yet"; return; }
-  let html = `<table><thead><tr><th>ID</th><th>Name</th><th>Client</th><th>Scope</th><th></th></tr></thead><tbody>`;
-  for (const p of projects) {
-    html += `<tr>
-      <td>${p.id}</td><td>${esc(p.name)}</td><td>${esc(p.client_name||"")}</td>
-      <td class="evidence">${esc(p.scope||"")}</td>
-      <td><button class="btn btn-secondary btn-sm" onclick="loadProjectScans(${p.id})">Scans</button></td>
-    </tr>`;
+  el.innerHTML = `<div class="empty">Loading…</div>`;
+  try {
+    const res = await fetch(`${API_BASE}/projects`, { headers: headers() });
+    const projects = res.ok ? await res.json() : [];
+    if (!projects.length) { el.innerHTML = `<div class="empty">No projects yet</div>`; return; }
+    let html = `<table><thead><tr><th>ID</th><th>Name</th><th>Scope</th><th></th></tr></thead><tbody>`;
+    for (const p of projects) {
+      html += `<tr>
+        <td>${p.id}</td>
+        <td>${esc(p.name)}</td>
+        <td class="evidence">${esc(p.scope || "")}</td>
+        <td><button class="btn btn-secondary btn-sm" onclick="loadProjectScans(${p.id})">Scans</button></td>
+      </tr>`;
+    }
+    el.innerHTML = html + `</tbody></table>`;
+  } catch (e) {
+    el.innerHTML = `<div class="empty">${esc(e.message)}</div>`;
   }
-  el.innerHTML = html + "</tbody></table>";
 }
 
 async function loadProjectScans(projectId) {
-  showView("history", document.querySelectorAll(".nav button")[2]);
-  const res = await fetch(`${API_BASE}/projects/${projectId}/scans`, {headers: headers()});
-  const scans = await res.json();
+  showView("history");
   const el = document.getElementById("historyTable");
-  if (!scans.length) { el.innerHTML = "No scans for this project"; return; }
+  el.innerHTML = `<div class="empty">Loading scans…</div>`;
+  const res = await fetch(`${API_BASE}/projects/${projectId}/scans`, { headers: headers() });
+  const scans = res.ok ? await res.json() : [];
+  if (!scans.length) { el.innerHTML = `<div class="empty">No scans for this project</div>`; return; }
   let html = `<table><thead><tr><th>ID</th><th>Target</th><th>Status</th><th>Progress</th><th></th></tr></thead><tbody>`;
   for (const s of scans) {
     html += `<tr>
-      <td>${s.id}</td><td>${esc(s.target)}</td><td>${esc(s.status)}</td><td>${s.progress}%</td>
-      <td>
+      <td>${s.id}</td>
+      <td>${esc(s.target)}</td>
+      <td>${esc(s.status)}</td>
+      <td>${s.progress || 0}%</td>
+      <td class="btn-row">
         <a class="btn btn-secondary btn-sm" target="_blank" href="${API_BASE}/scans/${s.id}/report">Report</a>
-        <button class="btn btn-secondary btn-sm" onclick="openScan(${s.id})">Findings</button>
+        <button class="btn btn-secondary btn-sm" onclick="openScan(${s.id})">Open</button>
       </td>
     </tr>`;
   }
-  el.innerHTML = html + "</tbody></table>";
+  el.innerHTML = html + `</tbody></table>`;
 }
 
 async function openScan(id) {
   currentScanId = id;
-  showView("scan", document.querySelectorAll(".nav button")[0]);
+  showView("scan");
   document.getElementById("statusCard").classList.remove("hidden");
   document.getElementById("exportWrap").classList.remove("hidden");
-  document.getElementById("reportLink").href = `${API_BASE}/scans/${id}/report`;
-  const pdf=document.getElementById("pdfLink"); if(pdf) pdf.href=`${API_BASE}/scans/${currentScanId}/report.pdf`;
-        document.getElementById("jsonLink").href = `${API_BASE}/scans/${id}/export`;
-  const res = await fetch(`${API_BASE}/scans/${id}`, {headers: headers()});
-  updateStatus(await res.json());
-  loadFindings();
+  const base = `${API_BASE}/scans/${id}`;
+  document.getElementById("reportLink").href = base + "/report";
+  document.getElementById("pdfLink").href = base + "/report.pdf";
+  document.getElementById("jsonLink").href = base + "/export";
+  const res = await fetch(base, { headers: headers() });
+  if (res.ok) updateStatus(await res.json());
+  await loadResults();
 }
 
-function loadHistory() {
-  document.getElementById("historyTable").innerHTML = "Pick a project from Projects tab, then click Scans.";
-}
-
-function esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}
+// restore auth label
+(function init() {
+  const t = localStorage.getItem("helix_token");
+  if (t) document.getElementById("authStatus").textContent = "Logged in (token saved)";
+})();
 </script>
 </body>
 </html>

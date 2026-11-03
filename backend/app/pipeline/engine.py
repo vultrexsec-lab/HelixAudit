@@ -3,7 +3,7 @@ HelixAudit Pipeline Engine
 Runs tools in order; each tool receives full context from previous tools.
 """
 
-from typing import List, Type
+from typing import List
 from .context import PipelineContext
 from .tools.base import BaseTool
 
@@ -22,7 +22,6 @@ class PipelineEngine:
 
         for i, tool in enumerate(self.tools):
             if progress_cb:
-                # 5% reserved start/end
                 pct = 5 + int((i / total) * 90)
                 try:
                     progress_cb(pct, tool.name)
@@ -30,10 +29,11 @@ class PipelineEngine:
                     pass
             try:
                 ctx = await tool.run(ctx)
-                ctx.log_tool(tool.name, "ok", f"Completed {tool.name}")
+                # tool may have logged itself; ensure ok if not error
+                if not any(l.get("tool") == tool.name for l in ctx.tool_logs):
+                    ctx.log_tool(tool.name, "ok", f"Completed {tool.name}")
             except Exception as e:
                 ctx.log_tool(tool.name, "error", str(e)[:300])
-                # continue chain — one tool failure must not kill pipeline
 
         if progress_cb:
             try:
@@ -44,24 +44,29 @@ class PipelineEngine:
 
 
 def default_tool_chain() -> List[BaseTool]:
-    """Ordered open-source-style tool chain (extensible)."""
     from .tools import (
+        subfinder_tool,
         subdomain_tool,
         port_tool,
+        httpx_tool,
         tech_tool,
         crawl_tool,
         secrets_tool,
         owasp_tool,
         active_tool,
         injection_tool,
+        nuclei_tool,
     )
     return [
+        subfinder_tool.SubfinderTool(),
         subdomain_tool.SubdomainTool(),
         port_tool.PortTool(),
+        httpx_tool.HttpxTool(),
         tech_tool.TechTool(),
         crawl_tool.CrawlTool(),
         secrets_tool.SecretsTool(),
         owasp_tool.OwaspTool(),
         active_tool.ActiveTool(),
         injection_tool.InjectionTool(),
+        nuclei_tool.NucleiTool(),
     ]

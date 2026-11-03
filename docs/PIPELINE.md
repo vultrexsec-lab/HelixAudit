@@ -1,26 +1,28 @@
 # HelixAudit Tool Pipeline
 
-## Logic
-1. Tools run **in order** (order field).
-2. Each tool receives full **PipelineContext** (domains, urls, ports, pages, findings…).
-3. Tool enriches context → next tool gets richer data.
-4. Failures are logged; chain continues.
-5. Final context → DB assets/findings → HTML/PDF/JSON report.
+## Chain order
+1. **subfinder** (binary) — passive subdomains  
+2. **subdomain_enum** — built-in brute/resolve  
+3. **port_scan** — nmap/TCP  
+4. **httpx_probe** (binary) — live host probe  
+5. **tech_detect** — fingerprint  
+6. **crawler** — pages + paths  
+7. **secrets_scan** — secret patterns  
+8. **owasp_surface** — headers/misconfig  
+9. **active_checks** — CORS/methods/files  
+10. **injection_detect** — SQLi/XSS probes  
+11. **nuclei** (binary) — template vulns  
 
-## Current chain
-1. subdomain_enum
-2. port_scan
-3. tech_detect
-4. crawler
-5. secrets_scan
-6. owasp_surface
-7. active_checks
-8. injection_detect
-(+ optional authenticated stage)
+Each tool gets full context from previous steps.
 
-## Adding a new open-source tool
-1. Create `backend/app/pipeline/tools/my_tool.py` implementing `BaseTool`.
-2. Register in `default_tool_chain()` in `engine.py`.
-3. Read prior context (`ctx.urls`, `ctx.domains`…), write findings via `ctx.add_finding(...)`.
+## Install binaries (server)
+```bash
+cd backend && bash scripts/install_tools.sh
+```
 
-This scales from 8 tools toward dozens without rewriting the core.
+Render build example:
+```
+pip install -r requirements.txt && bash scripts/install_tools.sh
+```
+
+Binaries are not committed (large); installed at deploy time into `backend/bin/`.

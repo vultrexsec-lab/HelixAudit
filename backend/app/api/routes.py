@@ -372,3 +372,14 @@ def generate_pdf_report(scan_id: int, db: Session = Depends(get_db)):
         media_type="application/pdf",
         headers={"Content-Disposition": f"attachment; filename=helixaudit-scan-{scan_id}.pdf"},
     )
+
+
+@router.get("/pipeline/tools")
+def list_pipeline_tools():
+    """List registered pipeline tools in execution order."""
+    from ..pipeline.engine import default_tool_chain
+    tools = default_tool_chain()
+    return [
+        {"name": t.name, "description": t.description, "order": t.order}
+        for t in sorted(tools, key=lambda x: x.order)
+    ]

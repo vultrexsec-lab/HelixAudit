@@ -38,6 +38,10 @@ class ScanCreate(BaseModel):
     project_id: int
     target: str
     scan_type: str = "discovery"
+    # Optional authenticated scan
+    username: str | None = None
+    password: str | None = None
+    login_url: str | None = None
 
 
 class ScanOut(BaseModel):
@@ -113,11 +117,20 @@ def create_scan(scan: ScanCreate, background_tasks: BackgroundTasks, db: Session
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     
+    config = {}
+    if scan.username:
+        config["username"] = scan.username
+    if scan.password:
+        config["password"] = scan.password  # note: sensitive; prefer ephemeral in production
+    if scan.login_url:
+        config["login_url"] = scan.login_url
+
     db_scan = Scan(
         project_id=scan.project_id,
         target=scan.target,
         scan_type=scan.scan_type,
-        status=ScanStatus.PENDING.value
+        status=ScanStatus.PENDING.value,
+        config=config or None,
     )
     db.add(db_scan)
     db.commit()

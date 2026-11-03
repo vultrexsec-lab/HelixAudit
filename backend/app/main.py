@@ -59,7 +59,7 @@ async def health():
     return {
         "status": "healthy",
         "version": settings.VERSION,
-        "phase": "8"
+        "phase": "9"
     }
 
 

@@ -3,289 +3,328 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>HelixAudit – Authorized Security Scanner</title>
+  <title>HelixAudit Dashboard</title>
   <style>
     :root {
-      --bg: #0f172a; --card: #1e293b; --accent: #3b82f6; --accent2: #8b5cf6;
-      --text: #e2e8f0; --muted: #94a3b8; --success: #22c55e; --warning: #f59e0b;
-      --danger: #ef4444; --border: #334155;
+      --bg:#0b1220; --panel:#111827; --card:#1e293b; --border:#334155;
+      --text:#e2e8f0; --muted:#94a3b8; --accent:#3b82f6; --accent2:#8b5cf6;
+      --ok:#22c55e; --warn:#f59e0b; --bad:#ef4444;
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.5; }
-    .container { max-width: 1100px; margin: 0 auto; padding: 2rem 1.25rem; }
-    header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem; }
-    .logo { font-size: 1.75rem; font-weight: 700; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-    .badge { background: #1e3a5f; color: #93c5fd; font-size: 0.75rem; padding: 0.25rem 0.6rem; border-radius: 999px; }
-    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; }
-    h2 { font-size: 1.15rem; margin-bottom: 1rem; color: #f1f5f9; }
-    label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 0.35rem; }
-    input, select { width: 100%; padding: 0.7rem 0.9rem; border-radius: 8px; border: 1px solid var(--border); background: #0f172a; color: var(--text); font-size: 0.95rem; margin-bottom: 1rem; }
-    input:focus, select:focus { outline: none; border-color: var(--accent); }
-    .btn { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 0.95rem; transition: opacity 0.2s; }
-    .btn:hover { opacity: 0.92; }
-    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    .btn-secondary { background: #334155; }
-    .btn-sm { padding: 0.35rem 0.7rem; font-size: 0.8rem; }
-    .row { display: flex; gap: 1rem; flex-wrap: wrap; }
-    .row > * { flex: 1; min-width: 180px; }
-    .status { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.9rem; }
-    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
-    .dot.running { background: var(--warning); animation: pulse 1s infinite; }
-    .dot.completed { background: var(--success); }
-    .dot.failed { background: var(--danger); }
-    @keyframes pulse { 50% { opacity: 0.4; } }
-    .progress-bar { height: 8px; background: #0f172a; border-radius: 4px; overflow: hidden; margin: 0.75rem 0; }
-    .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); transition: width 0.4s; }
-    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-    th, td { text-align: left; padding: 0.65rem 0.75rem; border-bottom: 1px solid var(--border); vertical-align: top; }
-    th { color: var(--muted); font-weight: 500; }
-    .sev { font-size: 0.72rem; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 600; text-transform: uppercase; white-space: nowrap; }
-    .sev-critical { background: #7f1d1d; color: #fecaca; }
-    .sev-high { background: #9a3412; color: #fed7aa; }
-    .sev-medium { background: #854d0e; color: #fde68a; }
-    .sev-low { background: #1e3a5f; color: #bfdbfe; }
-    .sev-info { background: #1e293b; color: #94a3b8; }
-    .warning-box { background: #422006; border: 1px solid #b45309; color: #fde68a; padding: 0.9rem 1rem; border-radius: 8px; font-size: 0.85rem; margin-bottom: 1.5rem; }
-    .empty { color: var(--muted); text-align: center; padding: 2rem; }
-    .evidence { font-size: 0.8rem; color: var(--muted); max-width: 280px; word-break: break-all; }
-    .actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
-    #results { display: none; }
-    .tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
-    .tab { padding: 0.4rem 0.9rem; border-radius: 6px; background: #0f172a; border: 1px solid var(--border); color: var(--muted); cursor: pointer; font-size: 0.85rem; }
-    .tab.active { background: var(--accent); color: white; border-color: var(--accent); }
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+    .layout{display:grid;grid-template-columns:240px 1fr;min-height:100vh}
+    .sidebar{background:var(--panel);border-right:1px solid var(--border);padding:1.25rem}
+    .logo{font-weight:800;font-size:1.3rem;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:1.5rem}
+    .nav button{width:100%;text-align:left;background:transparent;border:none;color:var(--muted);padding:0.7rem 0.8rem;border-radius:8px;cursor:pointer;margin-bottom:0.3rem}
+    .nav button.active,.nav button:hover{background:#1e293b;color:#fff}
+    .main{padding:1.5rem}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.25rem;margin-bottom:1rem}
+    h2{font-size:1.1rem;margin-bottom:0.9rem}
+    label{display:block;font-size:0.8rem;color:var(--muted);margin-bottom:0.3rem}
+    input,select{width:100%;padding:0.65rem 0.8rem;border-radius:8px;border:1px solid var(--border);background:#0f172a;color:var(--text);margin-bottom:0.8rem}
+    .row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:0.8rem}
+    .btn{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border:none;padding:0.7rem 1.2rem;border-radius:8px;font-weight:600;cursor:pointer}
+    .btn:disabled{opacity:.5;cursor:not-allowed}
+    .btn-secondary{background:#334155}
+    .btn-sm{padding:0.35rem 0.65rem;font-size:0.8rem}
+    table{width:100%;border-collapse:collapse;font-size:0.88rem}
+    th,td{padding:0.55rem 0.6rem;border-bottom:1px solid var(--border);text-align:left;vertical-align:top}
+    th{color:var(--muted);font-weight:500}
+    .sev{font-size:0.7rem;padding:0.12rem 0.4rem;border-radius:4px;font-weight:700;text-transform:uppercase}
+    .sev-critical{background:#7f1d1d;color:#fecaca}
+    .sev-high{background:#9a3412;color:#fed7aa}
+    .sev-medium{background:#854d0e;color:#fde68a}
+    .sev-low{background:#1e3a5f;color:#bfdbfe}
+    .sev-info{background:#1e293b;color:#94a3b8}
+    .warn{background:#422006;border:1px solid #b45309;color:#fde68a;padding:0.75rem 1rem;border-radius:8px;font-size:0.85rem;margin-bottom:1rem}
+    .muted{color:var(--muted);font-size:0.85rem}
+    .progress{height:8px;background:#0f172a;border-radius:4px;overflow:hidden;margin:0.6rem 0}
+    .bar{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));width:0%;transition:width .3s}
+    .hidden{display:none}
+    .evidence{font-size:0.78rem;color:var(--muted);word-break:break-all}
+    .badge{display:inline-block;background:#1e3a5f;color:#93c5fd;font-size:0.72rem;padding:0.15rem 0.5rem;border-radius:999px}
   </style>
 </head>
 <body>
-  <div class="container">
-    <header>
-      <div>
-        <div class="logo">HelixAudit</div>
-        <div style="color:var(--muted);font-size:0.85rem;margin-top:0.2rem">Authorized Security Scanner</div>
-      </div>
-      <span class="badge">Phase 8 • Export Ready</span>
-    </header>
-
-    <div class="warning-box">
-      ⚠️ <strong>Authorized use only.</strong> Only scan targets you own or have explicit written permission to test. Unauthorized scanning is illegal.
+<div class="layout">
+  <aside class="sidebar">
+    <div class="logo">HelixAudit</div>
+    <div class="nav">
+      <button class="active" onclick="showView('scan', this)">New Scan</button>
+      <button onclick="showView('projects', this); loadProjects()">Projects</button>
+      <button onclick="showView('history', this); loadHistory()">Scan History</button>
     </div>
-
-    <div class="card">
-      <h2>New Scan</h2>
-      <div class="row">
-        <div>
-          <label>Target URL or Domain</label>
-          <input id="target" type="text" placeholder="https://example.com" />
-        </div>
-        <div>
-          <label>Project Name (optional)</label>
-          <input id="projectName" type="text" placeholder="My Client Project" value="Quick Scan" />
-        </div>
-        <div>
-          <label>API Key (optional)</label>
-          <input id="apiKey" type="password" placeholder="If backend requires X-API-Key" />
-        </div>
-      </div>
-      <button class="btn" id="startBtn" onclick="startScan()">Start Discovery + Deep Analysis</button>
+    <div style="margin-top:2rem" class="muted">
+      <div class="badge">v0.9</div>
+      <div style="margin-top:0.5rem">Authorized use only</div>
     </div>
+  </aside>
 
-    <div class="card" id="statusCard" style="display:none">
-      <h2>Scan Status</h2>
-      <div class="status">
-        <span class="dot" id="statusDot"></span>
-        <span id="statusText">—</span>
-      </div>
-      <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
-      <div style="font-size:0.85rem;color:var(--muted)" id="scanMeta"></div>
-      <div style="margin-top:1rem;display:none;gap:0.5rem;flex-wrap:wrap" id="reportBtnWrap">
-        <a id="reportLink" href="#" target="_blank" class="btn btn-secondary btn-sm" style="text-decoration:none">HTML Report (Print/PDF)</a>
-        <a id="jsonLink" href="#" target="_blank" class="btn btn-secondary btn-sm" style="text-decoration:none">JSON Export</a>
-      </div>
-    </div>
+  <main class="main">
+    <div class="warn">⚠️ Only scan targets you own or have written permission to test.</div>
 
-    <div id="results">
+    <!-- NEW SCAN -->
+    <section id="view-scan">
       <div class="card">
-        <div class="tabs">
-          <div class="tab active" onclick="showTab('findings', this)">Findings</div>
-          <div class="tab" onclick="showTab('assets', this)">Assets</div>
+        <h2>New Assessment</h2>
+        <div class="row">
+          <div>
+            <label>Target URL / Domain *</label>
+            <input id="target" placeholder="https://example.com" />
+          </div>
+          <div>
+            <label>Project Name</label>
+            <input id="projectName" value="Quick Scan" />
+          </div>
+          <div>
+            <label>API Key (optional)</label>
+            <input id="apiKey" type="password" placeholder="X-API-Key if required" />
+          </div>
         </div>
-        <div id="findingsPanel">
-          <div id="findingsTable"><div class="empty">No findings yet</div></div>
+        <div class="row">
+          <div>
+            <label>Auth Username (optional)</label>
+            <input id="username" placeholder="For authenticated scan" />
+          </div>
+          <div>
+            <label>Auth Password (optional)</label>
+            <input id="password" type="password" placeholder="Used only for this scan" />
+          </div>
+          <div>
+            <label>Login URL (optional)</label>
+            <input id="loginUrl" placeholder="/login or full URL" />
+          </div>
         </div>
-        <div id="assetsPanel" style="display:none">
-          <div id="assetsTable"><div class="empty">No assets yet</div></div>
+        <button class="btn" id="startBtn" onclick="startScan()">Start Full Analysis</button>
+      </div>
+
+      <div class="card hidden" id="statusCard">
+        <h2>Scan Status</h2>
+        <div id="statusText" class="muted">—</div>
+        <div class="progress"><div class="bar" id="progressFill"></div></div>
+        <div id="scanMeta" class="muted"></div>
+        <div style="margin-top:0.8rem" class="hidden" id="exportWrap">
+          <a id="reportLink" class="btn btn-secondary btn-sm" target="_blank" style="text-decoration:none">HTML Report</a>
+          <a id="jsonLink" class="btn btn-secondary btn-sm" target="_blank" style="text-decoration:none;margin-left:0.4rem">JSON Export</a>
         </div>
       </div>
-    </div>
-  </div>
 
-  <script>
-    const API_BASE = "https://helixaudit.onrender.com/api/v1";
-    let currentScanId = null;
-    let pollTimer = null;
-    let allFindings = [];
+      <div class="card hidden" id="resultsCard">
+        <h2>Findings</h2>
+        <div id="findingsTable" class="muted">No data</div>
+      </div>
+    </section>
 
-    function headers() {
-      const h = { "Content-Type": "application/json" };
-      const key = document.getElementById("apiKey").value.trim();
-      if (key) h["X-API-Key"] = key;
-      return h;
-    }
+    <!-- PROJECTS -->
+    <section id="view-projects" class="hidden">
+      <div class="card">
+        <h2>Projects</h2>
+        <div id="projectsTable" class="muted">Loading...</div>
+      </div>
+    </section>
 
-    async function startScan() {
-      const target = document.getElementById("target").value.trim();
-      const projectName = document.getElementById("projectName").value.trim() || "Quick Scan";
-      if (!target) { alert("Please enter a target"); return; }
+    <!-- HISTORY -->
+    <section id="view-history" class="hidden">
+      <div class="card">
+        <h2>Recent Scans</h2>
+        <div class="muted" style="margin-bottom:0.8rem">Select a project first or view scans via project list.</div>
+        <div id="historyTable" class="muted">Open Projects and click a project to load its scans, or run a new scan.</div>
+      </div>
+    </section>
+  </main>
+</div>
 
-      const btn = document.getElementById("startBtn");
-      btn.disabled = true;
-      btn.textContent = "Starting...";
+<script>
+const API_BASE = "https://helixaudit.onrender.com/api/v1";
+let currentScanId = null, pollTimer = null, allFindings = [];
 
-      try {
-        const projRes = await fetch(`${API_BASE}/projects`, {
-          method: "POST", headers: headers(),
-          body: JSON.stringify({ name: projectName, description: "Created from HelixAudit UI", scope: target })
-        });
-        if (!projRes.ok) throw new Error(await projRes.text());
-        const project = await projRes.json();
+function headers() {
+  const h = {"Content-Type":"application/json"};
+  const k = document.getElementById("apiKey").value.trim();
+  if (k) h["X-API-Key"] = k;
+  return h;
+}
 
-        const scanRes = await fetch(`${API_BASE}/scans`, {
-          method: "POST", headers: headers(),
-          body: JSON.stringify({ project_id: project.id, target, scan_type: "discovery" })
-        });
-        if (!scanRes.ok) throw new Error(await scanRes.text());
-        const scan = await scanRes.json();
-        currentScanId = scan.id;
+function showView(name, btn) {
+  ["scan","projects","history"].forEach(v => {
+    document.getElementById("view-"+v).classList.toggle("hidden", v !== name);
+  });
+  document.querySelectorAll(".nav button").forEach(b => b.classList.remove("active"));
+  if (btn) btn.classList.add("active");
+}
 
-        document.getElementById("statusCard").style.display = "block";
-        document.getElementById("results").style.display = "none";
-        document.getElementById("reportBtnWrap").style.display = "none";
-        updateStatus(scan);
-        pollTimer = setInterval(pollScan, 3000);
-      } catch (err) {
-        alert("Error: " + err.message);
-        btn.disabled = false;
-        btn.textContent = "Start Discovery + Deep Analysis";
+async function startScan() {
+  const target = document.getElementById("target").value.trim();
+  if (!target) return alert("Enter target");
+  const btn = document.getElementById("startBtn");
+  btn.disabled = true; btn.textContent = "Starting...";
+
+  try {
+    const projRes = await fetch(`${API_BASE}/projects`, {
+      method:"POST", headers: headers(),
+      body: JSON.stringify({
+        name: document.getElementById("projectName").value.trim() || "Quick Scan",
+        description: "HelixAudit dashboard",
+        scope: target
+      })
+    });
+    if (!projRes.ok) throw new Error(await projRes.text());
+    const project = await projRes.json();
+
+    const body = {
+      project_id: project.id,
+      target,
+      scan_type: "discovery"
+    };
+    const u = document.getElementById("username").value.trim();
+    const p = document.getElementById("password").value;
+    const l = document.getElementById("loginUrl").value.trim();
+    if (u) body.username = u;
+    if (p) body.password = p;
+    if (l) body.login_url = l;
+
+    const scanRes = await fetch(`${API_BASE}/scans`, {
+      method:"POST", headers: headers(), body: JSON.stringify(body)
+    });
+    if (!scanRes.ok) throw new Error(await scanRes.text());
+    const scan = await scanRes.json();
+    currentScanId = scan.id;
+
+    document.getElementById("statusCard").classList.remove("hidden");
+    document.getElementById("resultsCard").classList.add("hidden");
+    document.getElementById("exportWrap").classList.add("hidden");
+    updateStatus(scan);
+    pollTimer = setInterval(pollScan, 3000);
+  } catch (e) {
+    alert("Error: " + e.message);
+    btn.disabled = false; btn.textContent = "Start Full Analysis";
+  }
+}
+
+async function pollScan() {
+  if (!currentScanId) return;
+  try {
+    const res = await fetch(`${API_BASE}/scans/${currentScanId}`, {headers: headers()});
+    const scan = await res.json();
+    updateStatus(scan);
+    if (scan.status === "completed" || scan.status === "failed") {
+      clearInterval(pollTimer);
+      document.getElementById("startBtn").disabled = false;
+      document.getElementById("startBtn").textContent = "Start Full Analysis";
+      if (scan.status === "completed") {
+        document.getElementById("exportWrap").classList.remove("hidden");
+        document.getElementById("reportLink").href = `${API_BASE}/scans/${currentScanId}/report`;
+        document.getElementById("jsonLink").href = `${API_BASE}/scans/${currentScanId}/export`;
+        loadFindings();
       }
     }
+  } catch (e) { console.error(e); }
+}
 
-    async function pollScan() {
-      if (!currentScanId) return;
-      try {
-        const res = await fetch(`${API_BASE}/scans/${currentScanId}`, { headers: headers() });
-        const scan = await res.json();
-        updateStatus(scan);
-        if (scan.status === "completed" || scan.status === "failed") {
-          clearInterval(pollTimer);
-          document.getElementById("startBtn").disabled = false;
-          document.getElementById("startBtn").textContent = "Start Discovery + Deep Analysis";
-          if (scan.status === "completed") {
-            loadResults();
-            const wrap = document.getElementById("reportBtnWrap");
-            const link = document.getElementById("reportLink");
-            wrap.style.display = "block";
-            link.href = `${API_BASE}/scans/${currentScanId}/report`;
-            const jsonLink = document.getElementById("jsonLink");
-            if (jsonLink) jsonLink.href = `${API_BASE}/scans/${currentScanId}/export`;
-          }
-        }
-      } catch (e) { console.error(e); }
-    }
+function updateStatus(scan) {
+  document.getElementById("statusText").textContent = `${(scan.status||"").toUpperCase()} • ${scan.progress||0}%`;
+  document.getElementById("progressFill").style.width = (scan.progress||0) + "%";
+  document.getElementById("scanMeta").textContent = `Scan #${scan.id} | ${scan.target}`;
+}
 
-    function updateStatus(scan) {
-      document.getElementById("statusDot").className = "dot " + (scan.status || "");
-      document.getElementById("statusText").textContent = `${(scan.status || "—").toUpperCase()}  •  Progress: ${scan.progress || 0}%`;
-      document.getElementById("progressFill").style.width = (scan.progress || 0) + "%";
-      document.getElementById("scanMeta").textContent = `Scan #${scan.id}  |  Target: ${scan.target}`;
-    }
+async function loadFindings() {
+  document.getElementById("resultsCard").classList.remove("hidden");
+  const res = await fetch(`${API_BASE}/scans/${currentScanId}/findings`, {headers: headers()});
+  allFindings = await res.json();
+  renderFindings();
+}
 
-    async function loadResults() {
-      document.getElementById("results").style.display = "block";
+function renderFindings() {
+  const el = document.getElementById("findingsTable");
+  if (!allFindings.length) { el.innerHTML = "No findings"; return; }
+  let html = `<table><thead><tr><th>Sev</th><th>Finding</th><th>Category</th><th>Status</th><th></th></tr></thead><tbody>`;
+  for (const f of allFindings) {
+    html += `<tr>
+      <td><span class="sev sev-${f.severity}">${f.severity}</span></td>
+      <td><strong>${esc(f.title)}</strong>
+        <div class="evidence">${esc(f.location||"")}</div>
+        <div class="evidence">${esc(String(f.evidence||"").slice(0,140))}</div>
+        <div class="evidence"><em>${esc(String(f.remediation||"").slice(0,120))}</em></div>
+      </td>
+      <td>${esc(f.category||"")}</td>
+      <td>${esc(f.status||"new")}</td>
+      <td><select onchange="setStatus(${f.id}, this.value)">
+        <option value="">Set...</option>
+        <option value="confirmed">Confirmed</option>
+        <option value="false_positive">False Positive</option>
+        <option value="fixed">Fixed</option>
+        <option value="retest">Retest</option>
+      </select></td>
+    </tr>`;
+  }
+  el.innerHTML = html + "</tbody></table>";
+}
 
-      const fRes = await fetch(`${API_BASE}/scans/${currentScanId}/findings`, { headers: headers() });
-      allFindings = await fRes.json();
-      renderFindings();
+async function setStatus(id, status) {
+  if (!status) return;
+  const res = await fetch(`${API_BASE}/findings/${id}`, {
+    method:"PATCH", headers: headers(), body: JSON.stringify({status})
+  });
+  if (res.ok) {
+    const u = await res.json();
+    const i = allFindings.findIndex(f => f.id === id);
+    if (i>=0) allFindings[i] = u;
+    renderFindings();
+  } else alert("Update failed");
+}
 
-      const aRes = await fetch(`${API_BASE}/scans/${currentScanId}/assets`, { headers: headers() });
-      const assets = await aRes.json();
-      const aContainer = document.getElementById("assetsTable");
-      if (!assets.length) {
-        aContainer.innerHTML = '<div class="empty">No assets discovered</div>';
-      } else {
-        let html = `<table><thead><tr><th>Type</th><th>Value</th></tr></thead><tbody>`;
-        for (const a of assets.slice(0, 80)) {
-          html += `<tr><td>${esc(a.asset_type)}</td><td>${esc(a.value)}</td></tr>`;
-        }
-        html += `</tbody></table>`;
-        if (assets.length > 80) html += `<div style="color:var(--muted);font-size:0.85rem;margin-top:0.5rem">Showing 80 of ${assets.length}</div>`;
-        aContainer.innerHTML = html;
-      }
-    }
+async function loadProjects() {
+  const res = await fetch(`${API_BASE}/projects`, {headers: headers()});
+  const projects = await res.json();
+  const el = document.getElementById("projectsTable");
+  if (!projects.length) { el.innerHTML = "No projects yet"; return; }
+  let html = `<table><thead><tr><th>ID</th><th>Name</th><th>Client</th><th>Scope</th><th></th></tr></thead><tbody>`;
+  for (const p of projects) {
+    html += `<tr>
+      <td>${p.id}</td><td>${esc(p.name)}</td><td>${esc(p.client_name||"")}</td>
+      <td class="evidence">${esc(p.scope||"")}</td>
+      <td><button class="btn btn-secondary btn-sm" onclick="loadProjectScans(${p.id})">Scans</button></td>
+    </tr>`;
+  }
+  el.innerHTML = html + "</tbody></table>";
+}
 
-    function renderFindings() {
-      const fContainer = document.getElementById("findingsTable");
-      if (!allFindings.length) {
-        fContainer.innerHTML = '<div class="empty">No findings recorded</div>';
-        return;
-      }
-      let html = `<table><thead><tr>
-        <th>Severity</th><th>Title / Evidence</th><th>Category</th><th>Status</th><th>Action</th>
-      </tr></thead><tbody>`;
-      for (const f of allFindings) {
-        html += `<tr>
-          <td><span class="sev sev-${f.severity}">${f.severity}</span></td>
-          <td>
-            <strong>${esc(f.title)}</strong>
-            ${f.location ? `<div class="evidence">${esc(f.location)}</div>` : ""}
-            ${f.evidence ? `<div class="evidence">${esc(String(f.evidence).slice(0, 160))}</div>` : ""}
-            ${f.remediation ? `<div class="evidence"><em>Fix: ${esc(String(f.remediation).slice(0, 120))}</em></div>` : ""}
-          </td>
-          <td>${esc(f.category || "—")}</td>
-          <td>${esc(f.status || "new")}</td>
-          <td class="actions">
-            <select onchange="updateStatus(${f.id}, this.value)" style="margin:0;padding:0.3rem;font-size:0.8rem">
-              <option value="">Change...</option>
-              <option value="confirmed">Confirmed</option>
-              <option value="false_positive">False Positive</option>
-              <option value="fixed">Fixed</option>
-              <option value="retest">Retest</option>
-              <option value="new">New</option>
-            </select>
-          </td>
-        </tr>`;
-      }
-      html += `</tbody></table>`;
-      fContainer.innerHTML = html;
-    }
+async function loadProjectScans(projectId) {
+  showView("history", document.querySelectorAll(".nav button")[2]);
+  const res = await fetch(`${API_BASE}/projects/${projectId}/scans`, {headers: headers()});
+  const scans = await res.json();
+  const el = document.getElementById("historyTable");
+  if (!scans.length) { el.innerHTML = "No scans for this project"; return; }
+  let html = `<table><thead><tr><th>ID</th><th>Target</th><th>Status</th><th>Progress</th><th></th></tr></thead><tbody>`;
+  for (const s of scans) {
+    html += `<tr>
+      <td>${s.id}</td><td>${esc(s.target)}</td><td>${esc(s.status)}</td><td>${s.progress}%</td>
+      <td>
+        <a class="btn btn-secondary btn-sm" target="_blank" href="${API_BASE}/scans/${s.id}/report">Report</a>
+        <button class="btn btn-secondary btn-sm" onclick="openScan(${s.id})">Findings</button>
+      </td>
+    </tr>`;
+  }
+  el.innerHTML = html + "</tbody></table>";
+}
 
-    async function updateStatus(findingId, status) {
-      if (!status) return;
-      try {
-        const res = await fetch(`${API_BASE}/findings/${findingId}`, {
-          method: "PATCH",
-          headers: headers(),
-          body: JSON.stringify({ status })
-        });
-        if (!res.ok) throw new Error(await res.text());
-        const updated = await res.json();
-        const idx = allFindings.findIndex(f => f.id === findingId);
-        if (idx >= 0) allFindings[idx] = updated;
-        renderFindings();
-      } catch (e) {
-        alert("Failed to update status: " + e.message);
-      }
-    }
+async function openScan(id) {
+  currentScanId = id;
+  showView("scan", document.querySelectorAll(".nav button")[0]);
+  document.getElementById("statusCard").classList.remove("hidden");
+  document.getElementById("exportWrap").classList.remove("hidden");
+  document.getElementById("reportLink").href = `${API_BASE}/scans/${id}/report`;
+  document.getElementById("jsonLink").href = `${API_BASE}/scans/${id}/export`;
+  const res = await fetch(`${API_BASE}/scans/${id}`, {headers: headers()});
+  updateStatus(await res.json());
+  loadFindings();
+}
 
-    function showTab(name, el) {
-      document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
-      el.classList.add("active");
-      document.getElementById("findingsPanel").style.display = name === "findings" ? "block" : "none";
-      document.getElementById("assetsPanel").style.display = name === "assets" ? "block" : "none";
-    }
+function loadHistory() {
+  document.getElementById("historyTable").innerHTML = "Pick a project from Projects tab, then click Scans.";
+}
 
-    function esc(str) {
-      if (!str) return "";
-      return String(str).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
-    }
-  </script>
+function esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}
+</script>
 </body>
 </html>

@@ -1,78 +1,101 @@
-"""Generate PDF report using reportlab."""
+"""Generate a clearer client-facing PDF report."""
 
 from io import BytesIO
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
 from reportlab.lib.units import mm
 
 
 def build_pdf_report(scan, project, findings, assets, counts) -> bytes:
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, leftMargin=18*mm, rightMargin=18*mm, topMargin=16*mm, bottomMargin=16*mm)
+    doc = SimpleDocTemplate(
+        buffer, pagesize=A4,
+        leftMargin=16 * mm, rightMargin=16 * mm,
+        topMargin=14 * mm, bottomMargin=14 * mm,
+    )
     styles = getSampleStyleSheet()
-    title_style = ParagraphStyle("T", parent=styles["Heading1"], fontSize=16, spaceAfter=8)
-    h2 = ParagraphStyle("H2", parent=styles["Heading2"], fontSize=12, spaceBefore=12, spaceAfter=6)
+    title_style = ParagraphStyle("T", parent=styles["Heading1"], fontSize=16, spaceAfter=6)
+    h2 = ParagraphStyle("H2", parent=styles["Heading2"], fontSize=12, spaceBefore=10, spaceAfter=5)
     body = styles["BodyText"]
-    small = ParagraphStyle("Small", parent=body, fontSize=8, textColor=colors.grey)
+    small = ParagraphStyle("Small", parent=body, fontSize=8, leading=10)
+    muted = ParagraphStyle("Muted", parent=body, fontSize=8, textColor=colors.grey)
 
     story = []
-    story.append(Paragraph("HelixAudit Security Assessment Report", title_style))
+    story.append(Paragraph("HelixAudit — Security Assessment Report", title_style))
     story.append(Paragraph(
-        f"Project: {getattr(project, 'name', 'N/A')} &nbsp;|&nbsp; Target: {scan.target}<br/>"
-        f"Scan #{scan.id} &nbsp;|&nbsp; Status: {scan.status}<br/>"
-        f"Window: {scan.started_at} → {scan.completed_at}",
+        f"<b>Project:</b> {getattr(project, 'name', 'N/A')} "
+        f"&nbsp;&nbsp; <b>Client:</b> {getattr(project, 'client_name', None) or 'N/A'}<br/>"
+        f"<b>Target:</b> {scan.target}<br/>"
+        f"<b>Scan ID:</b> #{scan.id} &nbsp;|&nbsp; <b>Status:</b> {scan.status}<br/>"
+        f"<b>Window:</b> {scan.started_at} → {scan.completed_at}",
         body,
     ))
-    story.append(Spacer(1, 8))
+    story.append(Spacer(1, 6))
+    story.append(Paragraph(
+        "This report summarizes automated discovery and surface analysis. "
+        "It supports professional review and does not replace expert manual testing.",
+        muted,
+    ))
 
-    story.append(Paragraph("Executive Summary", h2))
-    summary_data = [[
+    story.append(Paragraph("1. Executive Summary", h2))
+    summary = [[
         f"Critical: {counts.get('critical', 0)}",
         f"High: {counts.get('high', 0)}",
         f"Medium: {counts.get('medium', 0)}",
         f"Low: {counts.get('low', 0)}",
         f"Info: {counts.get('info', 0)}",
+        f"Assets: {len(assets)}",
     ]]
-    t = Table(summary_data, colWidths=[30*mm]*5)
+    t = Table(summary, colWidths=[28 * mm] * 6)
     t.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f1f5f9")),
-        ("FONTSIZE", (0, 0), (-1, -1), 9),
-        ("PADDING", (0, 0), (-1, -1), 6),
+        ("FONTSIZE", (0, 0), (-1, -1), 8),
+        ("PADDING", (0, 0), (-1, -1), 5),
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
     ]))
     story.append(t)
-    story.append(Spacer(1, 10))
 
-    story.append(Paragraph("Findings", h2))
+    story.append(Paragraph("2. Findings (detail)", h2))
     if not findings:
-        story.append(Paragraph("No findings.", body))
+        story.append(Paragraph("No findings recorded.", body))
     else:
-        header = ["Sev", "Title", "Category", "Status"]
-        rows = [header]
-        for f in findings[:80]:
-            rows.append([
-                (f.severity or "")[:8],
-                Paragraph((f.title or "")[:80], small),
-                Paragraph((f.category or "")[:40], small),
-                (f.status or "new")[:12],
-            ])
-        ft = Table(rows, colWidths=[18*mm, 90*mm, 45*mm, 22*mm])
-        ft.setStyle(TableStyle([
+        for i, f in enumerate(findings[:60], 1):
+            story.append(Paragraph(
+                f"<b>{i}. [{(f.severity or '').upper()}] {f.title or ''}</b>",
+                small,
+            ))
+            story.append(Paragraph(
+                f"Category: {f.category or '—'} | Status: {f.status or 'new'}<br/>"
+                f"Location: {f.location or '—'}<br/>"
+                f"Evidence: {(f.evidence or '—')[:350]}<br/>"
+                f"Remediation: {(f.remediation or '—')[:300]}",
+                small,
+            ))
+            story.append(Spacer(1, 4))
+
+    story.append(Paragraph("3. Asset sample", h2))
+    if not assets:
+        story.append(Paragraph("No assets.", body))
+    else:
+        rows = [["Type", "Value"]]
+        for a in assets[:40]:
+            rows.append([(a.asset_type or "")[:20], Paragraph((a.value or "")[:90], small)])
+        at = Table(rows, colWidths=[30 * mm, 140 * mm])
+        at.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#e2e8f0")),
             ("FONTSIZE", (0, 0), (-1, -1), 8),
             ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#cbd5e1")),
             ("VALIGN", (0, 0), (-1, -1), "TOP"),
-            ("PADDING", (0, 0), (-1, -1), 4),
+            ("PADDING", (0, 0), (-1, -1), 3),
         ]))
-        story.append(ft)
+        story.append(at)
 
     story.append(Spacer(1, 12))
     story.append(Paragraph(
-        "Generated by HelixAudit • Authorized testing only • Confidential. "
-        "Automated findings support expert review and do not replace manual testing.",
-        small,
+        "Generated by HelixAudit v1.0 • Authorized use only • Confidential",
+        muted,
     ))
-
     doc.build(story)
     return buffer.getvalue()

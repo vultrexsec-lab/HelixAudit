@@ -1,98 +1,108 @@
 """
-Safe injection *detection* probes (not a full exploit engine).
-Sends benign/safe payloads and looks for error signatures / reflection.
-Authorized use only.
+Stronger safe injection detection (still NOT a full exploit engine).
+Uses benign probes + error signatures + reflection checks.
 """
 
 import httpx
 from typing import List, Dict, Any
-from urllib.parse import urlparse, urlencode, parse_qs, urlunparse, urljoin
+from urllib.parse import urljoin, urlparse
 
 
 SQL_ERROR_SIGNATURES = [
     "sql syntax", "mysql_fetch", "mysqli_", "pg_query", "sqlite3.operationalerror",
-    "unclosed quotation mark", "odbc", "ora-01756", "syntax error", "sqlstate",
-    "you have an error in your sql", "warning: mysql",
+    "unclosed quotation mark", "odbc sql", "ora-01756", "ora-00933",
+    "syntax error", "sqlstate", "you have an error in your sql",
+    "warning: mysql", "pg_plan", "microsoft ole db", "odbc driver",
+    "jpa exception", "sqlcommand", "sqlite exception",
 ]
 
-XSS_REFLECT_MARKER = "helixauditxss042"
+SQL_PROBES = ["'", "\"", "' OR '1'='1", "1/0", "') OR ('1'='1"]
+XSS_MARKER = "helixauditxss042"
+XSS_PROBES = [
+    XSS_MARKER,
+    f"<div>{XSS_MARKER}</div>",
+    f"\"'{XSS_MARKER}",
+]
+PARAM_NAMES = ["id", "q", "search", "s", "query", "page", "product_id", "user", "name", "keyword", "cat", "category"]
 
-# Safe, non-destructive probe values
-SQL_PROBES = ["'", "\"", "' OR '1'='1", "1/0"]
+
+async def _get(client: httpx.AsyncClient, url: str) -> str:
+    try:
+        r = await client.get(url, timeout=8.0)
+        return r.text or ""
+    except Exception:
+        return ""
 
 
 async def check_sqli_surface(client: httpx.AsyncClient, base_url: str) -> List[Dict[str, Any]]:
-    findings = []
+    findings: List[Dict[str, Any]] = []
     parsed = urlparse(base_url if "://" in base_url else f"https://{base_url}")
     origin = f"{parsed.scheme}://{parsed.netloc}"
-    test_paths = [base_url]
-    # common param endpoints
-    for path in ["/", "/search", "/product", "/item", "/page"]:
-        test_paths.append(urljoin(origin + "/", path.lstrip("/")))
-
-    params_to_try = ["id", "q", "search", "page", "product_id", "user"]
+    pages = [base_url]
+    for path in ["/", "/search", "/product", "/item", "/page", "/index.php", "/api"]:
+        pages.append(urljoin(origin + "/", path.lstrip("/")))
 
     seen = set()
-    for page in test_paths[:4]:
-        for param in params_to_try:
+    for page in pages[:6]:
+        for param in PARAM_NAMES:
             for probe in SQL_PROBES:
                 key = f"{page}|{param}|{probe}"
                 if key in seen:
                     continue
                 seen.add(key)
+                sep = "&" if "?" in page else "?"
+                # minimal encoding via httpx params would be better; keep simple
+                test_url = f"{page}{sep}{param}={probe}"
+                body = (await _get(client, test_url)).lower()
+                for sig in SQL_ERROR_SIGNATURES:
+                    if sig in body:
+                        findings.append({
+                            "title": f"Possible SQL injection surface on '{param}'",
+                            "severity": "high",
+                            "category": "A05:2025 - Injection",
+                            "evidence": f"DB error signature '{sig}' after probe on {test_url[:200]}",
+                            "location": test_url[:400],
+                            "remediation": "Use parameterized queries/ORM. Never concatenate user input into SQL. Add WAF + input validation."
+                        })
+                        return findings
+    return findings
+
+
+async def check_xss_reflection(client: httpx.AsyncClient, base_url: str) -> List[Dict[str, Any]]:
+    findings: List[Dict[str, Any]] = []
+    parsed = urlparse(base_url if "://" in base_url else f"https://{base_url}")
+    origin = f"{parsed.scheme}://{parsed.netloc}"
+
+    for path in ["/", "/search", "/index.php"]:
+        for param in ["q", "search", "s", "query", "name", "keyword", "error"]:
+            for probe in XSS_PROBES:
                 try:
-                    url = page
-                    # append query
-                    sep = "&" if "?" in url else "?"
-                    test_url = f"{url}{sep}{param}={httpx.QueryParams({param: probe})[param]}"
-                    resp = await client.get(test_url, timeout=8.0)
-                    body = (resp.text or "").lower()
-                    for sig in SQL_ERROR_SIGNATURES:
-                        if sig in body:
-                            findings.append({
-                                "title": f"Possible SQL injection surface (error-based) on param '{param}'",
-                                "severity": "high",
-                                "category": "A05:2025 - Injection",
-                                "evidence": f"Probe caused DB error signature '{sig}' at {test_url[:180]}",
-                                "location": test_url[:300],
-                                "remediation": "Use parameterized queries / ORM. Never concatenate user input into SQL."
-                            })
-                            return findings  # one high-signal finding is enough per scan phase
+                    url = f"{urljoin(origin + '/', path.lstrip('/'))}?{param}={probe}"
+                    body = await _get(client, url)
+                    if XSS_MARKER in body:
+                        # rough context hint
+                        ctx = "body"
+                        low = body.lower()
+                        idx = low.find(XSS_MARKER.lower())
+                        snippet = body[max(0, idx - 40): idx + 40] if idx >= 0 else ""
+                        if "<script" in snippet.lower():
+                            ctx = "near script tag"
+                        findings.append({
+                            "title": f"Reflected XSS surface on '{param}' ({ctx})",
+                            "severity": "medium",
+                            "category": "A05:2025 - Injection",
+                            "evidence": f"Marker reflected from {url[:200]} | snippet={snippet[:80]}",
+                            "location": url[:400],
+                            "remediation": "Apply context-aware output encoding. Use strict Content-Security-Policy. Validate/encode all reflected input."
+                        })
+                        return findings
                 except Exception:
                     continue
     return findings
 
 
-async def check_xss_reflection(client: httpx.AsyncClient, base_url: str) -> List[Dict[str, Any]]:
-    findings = []
-    parsed = urlparse(base_url if "://" in base_url else f"https://{base_url}")
-    origin = f"{parsed.scheme}://{parsed.netloc}"
-    marker = XSS_REFLECT_MARKER
-    params = ["q", "search", "s", "query", "name", "keyword"]
-
-    for path in ["/", "/search"]:
-        for param in params:
-            try:
-                url = f"{urljoin(origin + '/', path.lstrip('/'))}?{param}={marker}"
-                resp = await client.get(url, timeout=8.0)
-                if marker in (resp.text or ""):
-                    # check if inside a script-ish context roughly
-                    findings.append({
-                        "title": f"Reflected XSS surface on parameter '{param}'",
-                        "severity": "medium",
-                        "category": "A05:2025 - Injection",
-                        "evidence": f"Marker reflected in response body from {url}",
-                        "location": url,
-                        "remediation": "Context-aware output encoding. Prefer strict CSP."
-                    })
-                    return findings
-            except Exception:
-                continue
-    return findings
-
-
 async def run_injection_detection(client: httpx.AsyncClient, base_url: str) -> List[Dict[str, Any]]:
-    results = []
-    results.extend(await check_sqli_surface(client, base_url))
-    results.extend(await check_xss_reflection(client, base_url))
-    return results
+    out: List[Dict[str, Any]] = []
+    out.extend(await check_sqli_surface(client, base_url))
+    out.extend(await check_xss_reflection(client, base_url))
+    return out

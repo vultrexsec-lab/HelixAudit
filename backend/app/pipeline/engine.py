@@ -1,16 +1,21 @@
 """
 HelixAudit Pipeline Engine
-Runs tools in order; each tool receives full context from previous tools.
+Runs tools in order with per-tool timeouts so one tool cannot hang the scan.
 """
 
+import asyncio
 from typing import List
 from .context import PipelineContext
 from .tools.base import BaseTool
 
+# Max seconds per tool — prevents stuck at 78% style hangs
+DEFAULT_TOOL_TIMEOUT = 45
+
 
 class PipelineEngine:
-    def __init__(self, tools: List[BaseTool] | None = None):
+    def __init__(self, tools: List[BaseTool] | None = None, tool_timeout: int = DEFAULT_TOOL_TIMEOUT):
         self.tools = sorted(tools or [], key=lambda t: t.order)
+        self.tool_timeout = tool_timeout
 
     def register(self, tool: BaseTool):
         self.tools.append(tool)
@@ -27,11 +32,29 @@ class PipelineEngine:
                     progress_cb(pct, tool.name)
                 except Exception:
                     pass
+
+            # Longer timeout for nuclei / httpx / subfinder
+            timeout = self.tool_timeout
+            if tool.name in ("nuclei", "httpx_probe", "subfinder", "crawler"):
+                timeout = 90
+            if tool.name in ("injection_detect", "active_checks"):
+                timeout = 40
+
             try:
-                ctx = await tool.run(ctx)
-                # tool may have logged itself; ensure ok if not error
+                ctx = await asyncio.wait_for(tool.run(ctx), timeout=timeout)
                 if not any(l.get("tool") == tool.name for l in ctx.tool_logs):
                     ctx.log_tool(tool.name, "ok", f"Completed {tool.name}")
+            except asyncio.TimeoutError:
+                ctx.log_tool(tool.name, "error", f"Timed out after {timeout}s")
+                ctx.add_finding(
+                    title=f"Tool timed out: {tool.name}",
+                    severity="info",
+                    category="Pipeline",
+                    evidence=f"{tool.name} exceeded {timeout}s and was skipped",
+                    location=ctx.target,
+                    remediation="Retry later or reduce target scope.",
+                    source_tool=tool.name,
+                )
             except Exception as e:
                 ctx.log_tool(tool.name, "error", str(e)[:300])
 

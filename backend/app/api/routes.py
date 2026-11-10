@@ -383,3 +383,20 @@ def list_pipeline_tools():
         {"name": t.name, "description": t.description, "order": t.order}
         for t in sorted(tools, key=lambda x: x.order)
     ]
+
+
+@router.post("/scans/{scan_id}/cancel")
+def cancel_scan(scan_id: int, db: Session = Depends(get_db)):
+    """Mark a stuck/running scan as failed so a new one can be started cleanly."""
+    scan = db.query(Scan).filter(Scan.id == scan_id).first()
+    if not scan:
+        raise HTTPException(status_code=404, detail="Scan not found")
+    if scan.status in ("completed", "failed", "cancelled"):
+        return {"id": scan.id, "status": scan.status, "message": "already finished"}
+    scan.status = "failed"
+    scan.error_message = "Cancelled or marked failed (was stuck/running too long)"
+    scan.progress = 100
+    from datetime import datetime
+    scan.completed_at = datetime.utcnow()
+    db.commit()
+    return {"id": scan.id, "status": scan.status, "message": "cancelled"}

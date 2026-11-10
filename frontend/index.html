@@ -251,7 +251,10 @@
         <div class="progress"><div class="bar" id="progressFill"></div></div>
         <div class="muted" id="scanMeta"></div>
         <div class="muted" id="scanHint" style="margin-top:0.35rem"></div>
-        <div class="btn-row hidden" id="exportWrap" style="margin-top:0.9rem">
+        <div class="btn-row" id="runningActions" style="margin-top:0.9rem">
+          <button class="btn btn-secondary btn-sm hidden" id="cancelBtn" onclick="cancelScan()">Cancel stuck scan</button>
+        </div>
+        <div class="btn-row hidden" id="exportWrap" style="margin-top:0.5rem">
           <a id="reportLink" class="btn btn-secondary btn-sm" target="_blank" rel="noopener">HTML Report</a>
           <a id="pdfLink" class="btn btn-secondary btn-sm" target="_blank" rel="noopener">PDF</a>
           <a id="jsonLink" class="btn btn-secondary btn-sm" target="_blank" rel="noopener">JSON</a>
@@ -359,6 +362,22 @@ async function doRegister() {
   alert("Registered — now click Login");
 }
 
+async function cancelScan() {
+  if (!currentScanId) return;
+  if (!confirm("Mark this scan as failed and stop waiting?")) return;
+  try {
+    const res = await fetch(`${API_BASE}/scans/${currentScanId}/cancel`, { method: "POST", headers: headers() });
+    const data = await res.json();
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+    document.getElementById("startBtn").disabled = false;
+    document.getElementById("startBtn").textContent = "Start Full Analysis";
+    updateStatus({ id: currentScanId, status: data.status || "failed", progress: 100, target: document.getElementById("scanMeta").textContent, error_message: data.message });
+    alert("Scan cancelled. Please start a NEW scan.");
+  } catch (e) {
+    alert("Cancel failed: " + e.message);
+  }
+}
+
 async function startScan() {
   const target = document.getElementById("target").value.trim();
   if (!target) return alert("Enter a target");
@@ -450,12 +469,23 @@ function updateStatus(scan) {
   const hint = document.getElementById("scanHint");
   if (hint) {
     if ((scan.status || "").toLowerCase() === "running") {
-      hint.textContent = "Pipeline running (subfinder → nuclei). Large targets can take 1–3 minutes. Results appear when status is COMPLETED.";
+      hint.textContent = "Pipeline running (subfinder → nuclei). Usually 1–3 min. If stuck past 5 min at same %, click Cancel stuck scan and start a new scan.";
     } else if ((scan.status || "").toLowerCase() === "completed") {
       hint.textContent = "Scan finished. Findings and assets are below.";
+    } else if ((scan.status || "").toLowerCase() === "failed") {
+      hint.textContent = scan.error_message || "Scan failed. Start a new scan.";
     } else {
       hint.textContent = "";
     }
+  }
+  const cancelBtn = document.getElementById("cancelBtn");
+  if (cancelBtn) {
+    const st = (scan.status || "").toLowerCase();
+    cancelBtn.classList.toggle("hidden", st !== "running" && st !== "pending");
+  }
+  const exportWrap = document.getElementById("exportWrap");
+  if (exportWrap && (scan.status || "").toLowerCase() === "running") {
+    exportWrap.classList.add("hidden");
   }
   const dot = document.getElementById("statusDot");
   dot.className = "dot " + st;

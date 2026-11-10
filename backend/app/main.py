@@ -90,7 +90,7 @@ async def _process_due_schedules():
             db.commit()
             db.refresh(scan)
             # run in background asyncio task
-            asyncio.create_task(run_discovery_scan(SessionLocal(), scan.id))
+            asyncio.create_task(run_discovery_scan(scan.id))
     except Exception as e:
         print("Scheduler tick error:", e)
     finally:

@@ -142,5 +142,5 @@ async def run_schedule_now(
     sched.next_run_at = datetime.utcnow() + td(hours=sched.interval_hours or 24)
     db.commit()
     db.refresh(scan)
-    background_tasks.add_task(run_discovery_scan, db, scan.id)
+    background_tasks.add_task(run_discovery_scan, scan.id)
     return {"scan_id": scan.id, "status": "started"}

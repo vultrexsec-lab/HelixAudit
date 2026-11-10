@@ -137,7 +137,7 @@ def create_scan(scan: ScanCreate, background_tasks: BackgroundTasks, db: Session
     db.refresh(db_scan)
     
     # Start scan in background
-    background_tasks.add_task(run_discovery_scan, db, db_scan.id)
+    background_tasks.add_task(run_discovery_scan, db_scan.id)
     
     return db_scan
 

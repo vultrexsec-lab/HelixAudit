@@ -30,7 +30,7 @@ class HttpxTool(BaseTool):
         def _run():
             return subprocess.run(
                 [binary, "-silent", "-status-code", "-title", "-tech-detect", "-json", "-timeout", "10"],
-                input=input_data, capture_output=True, text=True, timeout=180,
+                input=input_data, capture_output=True, text=True, timeout=60,
             )
 
         proc = await asyncio.to_thread(_run)

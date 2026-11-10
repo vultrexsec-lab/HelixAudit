@@ -1,10 +1,9 @@
 """
-HelixAudit Scan Service — Pipeline-driven
-Each tool receives accumulated context from previous tools.
+HelixAudit Scan Service — Pipeline-driven with safe DB sessions.
 """
 
 from datetime import datetime
-from sqlalchemy.orm import Session
+from ..core.database import SessionLocal
 from ..models.models import Scan, Asset, Finding, ScanStatus, Severity
 from ..pipeline.engine import PipelineEngine, default_tool_chain
 from ..scanners.auth_scan import attempt_form_login, authenticated_crawl
@@ -20,26 +19,72 @@ def _sev(s: str) -> str:
     }.get((s or "info").lower(), Severity.INFO.value)
 
 
-async def run_discovery_scan(db: Session, scan_id: int):
-    scan = db.query(Scan).filter(Scan.id == scan_id).first()
-    if not scan:
-        return
-
+def _set_progress(scan_id: int, progress: int, status: str | None = None):
+    db = SessionLocal()
     try:
+        scan = db.query(Scan).filter(Scan.id == scan_id).first()
+        if not scan:
+            return
+        scan.progress = min(99, max(0, progress))
+        if status:
+            scan.status = status
+        db.commit()
+    except Exception as e:
+        print("progress update error:", e)
+        db.rollback()
+    finally:
+        db.close()
+
+
+async def run_discovery_scan(scan_id: int):
+    """Background-safe: opens its own DB session. Do NOT pass request session."""
+    db = SessionLocal()
+    try:
+        scan = db.query(Scan).filter(Scan.id == scan_id).first()
+        if not scan:
+            return
+
         scan.status = ScanStatus.RUNNING.value
         scan.started_at = datetime.utcnow()
         scan.progress = 3
         scan.error_message = None
         db.commit()
 
+        target = (scan.target or "").strip()
+        config = dict(scan.config or {})
+        db.close()  # release before long-running pipeline
+        db = None
+
         def progress_cb(pct: int, tool_name: str):
-            scan.progress = min(95, max(3, pct))
-            db.commit()
+            print(f"[scan {scan_id}] {pct}% — {tool_name}")
+            _set_progress(scan_id, pct, ScanStatus.RUNNING.value)
 
         engine = PipelineEngine(default_tool_chain())
-        ctx = await engine.run(scan.target.strip(), config=scan.config or {}, progress_cb=progress_cb)
+        try:
+            ctx = await engine.run(target, config=config, progress_cb=progress_cb)
+        except Exception as e:
+            print(f"[scan {scan_id}] pipeline error:", e)
+            db = SessionLocal()
+            scan = db.query(Scan).filter(Scan.id == scan_id).first()
+            if scan:
+                scan.status = ScanStatus.FAILED.value
+                scan.error_message = f"Pipeline error: {str(e)[:400]}"
+                scan.completed_at = datetime.utcnow()
+                scan.progress = 100
+                db.commit()
+            db.close()
+            return
 
-        # Persist domains
+        # Persist results with a fresh session
+        db = SessionLocal()
+        scan = db.query(Scan).filter(Scan.id == scan_id).first()
+        if not scan:
+            db.close()
+            return
+
+        scan.progress = 90
+        db.commit()
+
         for d in ctx.domains:
             db.add(Asset(scan_id=scan.id, asset_type="subdomain", value=d, extra_data={"source": "pipeline"}))
         for p in ctx.ports:
@@ -53,7 +98,7 @@ async def run_discovery_scan(db: Session, scan_id: int):
         if ctx.technologies:
             db.add(Asset(
                 scan_id=scan.id, asset_type="technology",
-                value=scan.target,
+                value=target,
                 extra_data={"technologies": ctx.technologies, "headers": ctx.headers},
             ))
         for page in ctx.pages[:50]:
@@ -63,70 +108,76 @@ async def run_discovery_scan(db: Session, scan_id: int):
             if path.get("url"):
                 db.add(Asset(scan_id=scan.id, asset_type="path", value=path.get("url"), extra_data=path))
 
-        # Pipeline findings
         for f in ctx.findings:
             db.add(Finding(
                 scan_id=scan.id,
-                title=f.title,
-                description=f"[{f.source_tool}] {f.title}",
+                title=f.title[:500] if f.title else "Finding",
+                description=f"[{f.source_tool}] {f.title}"[:1000],
                 severity=_sev(f.severity),
-                category=f.category,
-                evidence=f.evidence,
-                location=f.location,
-                remediation=f.remediation,
+                category=(f.category or "general")[:100],
+                evidence=(f.evidence or "")[:5000],
+                location=(f.location or "")[:1000],
+                remediation=(f.remediation or "")[:2000],
                 extra_data={"source_tool": f.source_tool},
             ))
 
-        # Tool execution log as info findings summary
         ok = sum(1 for t in ctx.tool_logs if t.get("status") == "ok")
         err = sum(1 for t in ctx.tool_logs if t.get("status") == "error")
+        skipped = sum(1 for t in ctx.tool_logs if t.get("status") == "skipped")
         db.add(Finding(
             scan_id=scan.id,
-            title=f"Pipeline complete: {ok} tools ok, {err} errors",
+            title=f"Pipeline complete: {ok} ok, {skipped} skipped, {err} errors",
             description="Tool chain finished",
             severity=Severity.INFO.value,
             category="Pipeline",
-            evidence=str(ctx.to_summary()),
-            location=scan.target,
+            evidence=str(ctx.to_summary())[:5000],
+            location=target,
             remediation="Review tool_logs in evidence for per-tool status.",
             extra_data={"tool_logs": ctx.tool_logs},
         ))
         db.commit()
 
-        # Optional authenticated stage (uses credentials from config)
-        config = scan.config or {}
+        # Optional authenticated stage
         if config.get("username") and config.get("password"):
-            scan.progress = 92
+            scan.progress = 94
             db.commit()
-            auth_client, auth_info = await attempt_form_login(
-                scan.target, config["username"], config["password"], config.get("login_url")
-            )
-            db.add(Finding(
-                scan_id=scan.id,
-                title="Authenticated stage attempted",
-                description=auth_info.get("message", ""),
-                severity=Severity.INFO.value,
-                category="Authenticated Scanning",
-                evidence=str(auth_info),
-                location=auth_info.get("login_url") or scan.target,
-                remediation="Verify authz on authenticated resources.",
-            ))
-            if auth_client:
-                try:
-                    if auth_info.get("success"):
-                        for ap in await authenticated_crawl(auth_client, scan.target):
-                            db.add(Asset(scan_id=scan.id, asset_type="auth_page", value=ap.get("url"), extra_data=ap))
-                    await auth_client.aclose()
-                except Exception:
+            try:
+                auth_client, auth_info = await attempt_form_login(
+                    target, config["username"], config["password"], config.get("login_url")
+                )
+                db.add(Finding(
+                    scan_id=scan.id,
+                    title="Authenticated stage attempted",
+                    description=(auth_info.get("message") or "")[:500],
+                    severity=Severity.INFO.value,
+                    category="Authenticated Scanning",
+                    evidence=str(auth_info)[:3000],
+                    location=auth_info.get("login_url") or target,
+                    remediation="Verify authorization on authenticated resources.",
+                ))
+                if auth_client:
                     try:
+                        if auth_info.get("success"):
+                            for ap in await authenticated_crawl(auth_client, target):
+                                db.add(Asset(
+                                    scan_id=scan.id,
+                                    asset_type="auth_page",
+                                    value=ap.get("url") or "",
+                                    extra_data=ap,
+                                ))
                         await auth_client.aclose()
                     except Exception:
-                        pass
-            db.commit()
+                        try:
+                            await auth_client.aclose()
+                        except Exception:
+                            pass
+                db.commit()
+            except Exception as e:
+                print("auth stage error:", e)
 
-        # Clear password
+        # Clear password from stored config
         try:
-            if scan.config and "password" in (scan.config or {}):
+            if scan.config and isinstance(scan.config, dict) and "password" in scan.config:
                 cfg = dict(scan.config)
                 cfg["password"] = "***cleared***"
                 scan.config = cfg
@@ -137,9 +188,30 @@ async def run_discovery_scan(db: Session, scan_id: int):
         scan.progress = 100
         scan.completed_at = datetime.utcnow()
         db.commit()
+        print(f"[scan {scan_id}] COMPLETED findings={len(ctx.findings)} urls={len(ctx.urls)}")
 
     except Exception as e:
-        scan.status = ScanStatus.FAILED.value
-        scan.error_message = str(e)[:500]
-        scan.completed_at = datetime.utcnow()
-        db.commit()
+        print(f"[scan {scan_id}] FATAL:", e)
+        try:
+            if db:
+                db.rollback()
+                db.close()
+        except Exception:
+            pass
+        db = SessionLocal()
+        try:
+            scan = db.query(Scan).filter(Scan.id == scan_id).first()
+            if scan:
+                scan.status = ScanStatus.FAILED.value
+                scan.error_message = str(e)[:500]
+                scan.completed_at = datetime.utcnow()
+                scan.progress = 100
+                db.commit()
+        finally:
+            db.close()
+    finally:
+        try:
+            if db:
+                db.close()
+        except Exception:
+            pass

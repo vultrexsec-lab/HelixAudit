@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Phase C: install ProjectDiscovery binaries for pipeline tools
 set -e
 BIN_DIR="$(cd "$(dirname "$0")/.." && pwd)/bin"
 mkdir -p "$BIN_DIR"
@@ -22,5 +23,12 @@ install_zip nuclei "https://github.com/projectdiscovery/nuclei/releases/download
 install_zip pdhttpx "https://github.com/projectdiscovery/httpx/releases/download/v1.6.9/httpx_1.6.9_linux_amd64.zip" httpx
 install_zip subfinder "https://github.com/projectdiscovery/subfinder/releases/download/v2.6.7/subfinder_2.6.7_linux_amd64.zip" subfinder
 
-"$BIN_DIR/nuclei" -update-templates -silent 2>/dev/null || true
+# Templates (best-effort; makes nuclei useful)
+if [ -x "$BIN_DIR/nuclei" ]; then
+  echo "Updating nuclei templates..."
+  "$BIN_DIR/nuclei" -update-templates -silent 2>/dev/null || \
+    "$BIN_DIR/nuclei" -ut 2>/dev/null || true
+fi
+
 echo "Tools ready in $BIN_DIR"
+ls -la "$BIN_DIR"

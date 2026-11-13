@@ -7,6 +7,7 @@ from ..core.database import SessionLocal
 from ..models.models import Scan, Asset, Finding, ScanStatus, Severity
 from ..pipeline.engine import PipelineEngine, default_tool_chain
 from .finding_quality import mask_secrets, dedupe_findings, risk_score, build_executive_summary
+from .notify import send_scan_complete_email, email_configured
 from ..scanners.auth_scan import attempt_form_login, authenticated_crawl, auth_findings_from_pages
 
 
@@ -226,6 +227,30 @@ async def run_discovery_scan(scan_id: int):
         scan.completed_at = datetime.utcnow()
         db.commit()
         print(f"[scan {scan_id}] COMPLETED findings={len(ctx.findings)} urls={len(ctx.urls)}")
+
+        # Phase B: email notify (optional SMTP)
+        try:
+            from ..models.models import Project
+            proj = db.query(Project).filter(Project.id == scan.project_id).first()
+            all_f = db.query(Finding).filter(Finding.scan_id == scan.id).all()
+            counts = {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0}
+            for f in all_f:
+                if f.severity in counts:
+                    counts[f.severity] += 1
+            if email_configured():
+                result = send_scan_complete_email(
+                    to_email=None,
+                    project_name=proj.name if proj else "Project",
+                    scan_id=scan.id,
+                    target=scan.target,
+                    status=scan.status,
+                    counts=counts,
+                    report_hint=f"HTML/PDF: /api/v1/scans/{scan.id}/report and /report.pdf",
+                )
+                print(f"[scan {scan_id}] email:", result)
+        except Exception as ne:
+            print("notify error:", ne)
+
 
     except Exception as e:
         print(f"[scan {scan_id}] FATAL:", e)

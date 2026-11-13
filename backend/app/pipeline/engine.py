@@ -1,6 +1,5 @@
 """
-HelixAudit Pipeline Engine
-Runs tools in order with per-tool timeouts so one tool cannot hang the scan.
+HelixAudit Pipeline Engine — VAPT-oriented sequential tool chain.
 """
 
 import asyncio
@@ -8,7 +7,6 @@ from typing import List
 from .context import PipelineContext
 from .tools.base import BaseTool
 
-# Max seconds per tool — prevents stuck at 78% style hangs
 DEFAULT_TOOL_TIMEOUT = 45
 
 
@@ -33,12 +31,11 @@ class PipelineEngine:
                 except Exception:
                     pass
 
-            # Longer timeout for nuclei / httpx / subfinder
             timeout = self.tool_timeout
             if tool.name in ("nuclei", "httpx_probe", "subfinder", "crawler"):
                 timeout = 90
-            if tool.name in ("injection_detect", "active_checks"):
-                timeout = 40
+            if tool.name in ("injection_detect", "active_checks", "vuln_paths"):
+                timeout = 50
 
             try:
                 ctx = await asyncio.wait_for(tool.run(ctx), timeout=timeout)
@@ -50,9 +47,9 @@ class PipelineEngine:
                     title=f"Tool timed out: {tool.name}",
                     severity="info",
                     category="Pipeline",
-                    evidence=f"{tool.name} exceeded {timeout}s and was skipped",
+                    evidence=f"{tool.name} exceeded {timeout}s",
                     location=ctx.target,
-                    remediation="Retry later or reduce target scope.",
+                    remediation="Retry or reduce scope.",
                     source_tool=tool.name,
                 )
             except Exception as e:
@@ -67,35 +64,53 @@ class PipelineEngine:
 
 
 def default_tool_chain() -> List[BaseTool]:
+    """Full automated VAPT-assist chain (authorized targets only)."""
     from .tools import (
         subfinder_tool,
         subdomain_tool,
+        dns_email_tool,
         port_tool,
         httpx_tool,
+        waf_detect_tool,
         ssl_tool,
+        https_redirect_tool,
         tech_tool,
         crawl_tool,
+        sitemap_tool,
         api_discover_tool,
         headers_baseline_tool,
+        vuln_paths_tool,
         secrets_tool,
         owasp_tool,
         active_tool,
         injection_tool,
         nuclei_tool,
+        vapt_summary_tool,
     )
     return [
+        # Phase 1 — Recon
         subfinder_tool.SubfinderTool(),
         subdomain_tool.SubdomainTool(),
+        dns_email_tool.DnsEmailTool(),
         port_tool.PortTool(),
         httpx_tool.HttpxTool(),
+        waf_detect_tool.WafDetectTool(),
+        # Phase 2 — Config / transport
         ssl_tool.SslTool(),
+        https_redirect_tool.HttpsRedirectTool(),
         tech_tool.TechTool(),
+        # Phase 3 — Enumeration
         crawl_tool.CrawlTool(),
+        sitemap_tool.SitemapTool(),
         api_discover_tool.ApiDiscoverTool(),
         headers_baseline_tool.HeadersBaselineTool(),
+        vuln_paths_tool.VulnPathsTool(),
+        # Phase 4 — Vulnerability assessment (surface/detection)
         secrets_tool.SecretsTool(),
         owasp_tool.OwaspTool(),
         active_tool.ActiveTool(),
         injection_tool.InjectionTool(),
         nuclei_tool.NucleiTool(),
+        # Phase 5 — Summary
+        vapt_summary_tool.VaptSummaryTool(),
     ]

@@ -1,12 +1,17 @@
-"""White-label capable PDF report (Phase B)."""
+"""White-label PDF report — hardened for ReportLab escaping."""
 
 from io import BytesIO
+from xml.sax.saxutils import escape
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.units import mm
 from ..core.config import settings
+
+
+def _p(text: str, style) -> Paragraph:
+    return Paragraph(escape(str(text or "")).replace("\n", "<br/>"), style)
 
 
 def build_pdf_report(scan, project, findings, assets, counts) -> bytes:
@@ -28,27 +33,27 @@ def build_pdf_report(scan, project, findings, assets, counts) -> bytes:
     footer = settings.BRAND_REPORT_FOOTER
 
     story = []
-    story.append(Paragraph(f"{brand} — Security Assessment Report", title_style))
-    story.append(Paragraph(
-        f"<b>Prepared for:</b> {client}<br/>"
-        f"<b>Project:</b> {getattr(project, 'name', 'N/A')}<br/>"
-        f"<b>Target:</b> {scan.target}<br/>"
-        f"<b>Scan ID:</b> #{scan.id} &nbsp;|&nbsp; <b>Status:</b> {scan.status}<br/>"
-        f"<b>Window:</b> {scan.started_at} → {scan.completed_at}",
+    story.append(_p(f"{brand} — Security Assessment Report", title_style))
+    story.append(_p(
+        f"Prepared for: {client}\n"
+        f"Project: {getattr(project, 'name', 'N/A')}\n"
+        f"Target: {scan.target}\n"
+        f"Scan ID: #{scan.id} | Status: {scan.status}\n"
+        f"Window: {scan.started_at} → {scan.completed_at}",
         body,
     ))
     story.append(Spacer(1, 6))
-    story.append(Paragraph(
+    story.append(_p(
         "Automated discovery and assessment support expert review. Authorized use only.",
         muted,
     ))
 
     exec_findings = [f for f in findings if (getattr(f, "category", None) or "") == "Executive Summary"]
     exec_text = (exec_findings[0].evidence if exec_findings else "") or ""
-    story.append(Paragraph("1. Executive Summary", h2))
+    story.append(_p("1. Executive Summary", h2))
     if exec_text:
-        for line in exec_text.splitlines()[:12]:
-            story.append(Paragraph(line.replace("&", "&amp;").replace("<", "&lt;"), small))
+        for line in exec_text.splitlines()[:15]:
+            story.append(_p(line, small))
         story.append(Spacer(1, 6))
 
     summary = [[
@@ -78,38 +83,38 @@ def build_pdf_report(scan, project, findings, assets, counts) -> bytes:
         if f not in auth_fs and (getattr(f, "category", None) or "") != "Executive Summary"
     ]
 
-    story.append(Paragraph("2. Public surface findings", h2))
-    story.append(Paragraph(f"Count: {len(pub_fs)}", small))
+    story.append(_p("2. Public surface findings", h2))
+    story.append(_p(f"Count: {len(pub_fs)}", small))
     if not pub_fs:
-        story.append(Paragraph("No public findings recorded.", body))
+        story.append(_p("No public findings recorded.", body))
     else:
-        for i, f in enumerate(pub_fs[:50], 1):
-            story.append(Paragraph(f"<b>{i}. [{(f.severity or '').upper()}] {f.title or ''}</b>", small))
-            story.append(Paragraph(
-                f"Location: {f.location or '—'}<br/>"
-                f"Evidence: {str(f.evidence or '—')[:280]}<br/>"
+        for i, f in enumerate(pub_fs[:60], 1):
+            story.append(_p(f"{i}. [{(f.severity or '').upper()}] {f.title or ''}", small))
+            story.append(_p(
+                f"Location: {f.location or '—'}\n"
+                f"Evidence: {str(f.evidence or '—')[:280]}\n"
                 f"Remediation: {str(f.remediation or '—')[:200]}",
                 small,
             ))
 
-    story.append(Paragraph("3. Authenticated findings", h2))
+    story.append(_p("3. Authenticated findings", h2))
     if not auth_fs:
-        story.append(Paragraph("No authenticated findings (login not used or failed).", body))
+        story.append(_p("No authenticated findings (login not used or failed).", body))
     else:
         for i, f in enumerate(auth_fs[:30], 1):
-            story.append(Paragraph(f"<b>{i}. [{(f.severity or '').upper()}] {f.title or ''}</b>", small))
-            story.append(Paragraph(
-                f"Location: {f.location or '—'}<br/>Evidence: {str(f.evidence or '—')[:250]}",
+            story.append(_p(f"{i}. [{(f.severity or '').upper()}] {f.title or ''}", small))
+            story.append(_p(
+                f"Location: {f.location or '—'}\nEvidence: {str(f.evidence or '—')[:250]}",
                 small,
             ))
 
-    story.append(Paragraph("4. Asset sample", h2))
+    story.append(_p("4. Asset sample", h2))
     if not assets:
-        story.append(Paragraph("No assets.", body))
+        story.append(_p("No assets.", body))
     else:
         rows = [["Type", "Value"]]
         for a in assets[:40]:
-            rows.append([(a.asset_type or "")[:20], Paragraph((a.value or "")[:90], small)])
+            rows.append([(a.asset_type or "")[:20], _p((a.value or "")[:90], small)])
         at = Table(rows, colWidths=[30 * mm, 140 * mm])
         at.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#e2e8f0")),
@@ -121,9 +126,6 @@ def build_pdf_report(scan, project, findings, assets, counts) -> bytes:
         story.append(at)
 
     story.append(Spacer(1, 12))
-    story.append(Paragraph(
-        f"{footer}<br/>Generated by {brand} v{settings.VERSION}",
-        muted,
-    ))
+    story.append(_p(f"{footer}\nGenerated by {brand} v{settings.VERSION}", muted))
     doc.build(story)
     return buffer.getvalue()

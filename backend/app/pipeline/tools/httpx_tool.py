@@ -42,7 +42,7 @@ class HttpxTool(BaseTool):
             try:
                 obj = json.loads(line)
             except Exception:
-                ctx.merge_urls([line])
+                # do not store CLI error text as assets/urls
                 continue
             url = obj.get("url") or obj.get("input")
             if url:

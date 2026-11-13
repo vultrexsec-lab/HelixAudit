@@ -447,7 +447,7 @@ async function pollScan() {
         const pdf = document.getElementById("pdfLink");
         const jl = document.getElementById("jsonLink");
         if (rl) rl.href = base + "/report";
-        if (pdf) pdf.href = base + "/report.pdf";
+        if (pdf) pdf.href = base + "/report/pdf";
         if (jl) jl.href = base + "/export";
         await loadResults();
       } else {
@@ -648,7 +648,7 @@ async function openScan(id) {
   document.getElementById("exportWrap").classList.remove("hidden");
   const base = `${API_BASE}/scans/${id}`;
   document.getElementById("reportLink").href = base + "/report";
-  document.getElementById("pdfLink").href = base + "/report.pdf";
+  document.getElementById("pdfLink").href = base + "/report/pdf";
   document.getElementById("jsonLink").href = base + "/export";
   const res = await fetch(base, { headers: headers() });
   if (res.ok) updateStatus(await res.json());

@@ -96,13 +96,21 @@ def check_sensitive_paths(paths: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         url = p.get("url")
         if not path:
             continue
-        if path in high and status in [200, 401, 403]:
+        if path in high and status == 200:
             findings.append({
-                "title": f"Sensitive path exposed: /{path} [{status}]",
-                "severity": "high" if status == 200 else "medium",
+                "title": f"Sensitive path responds 200: /{path}",
+                "severity": "high",
                 "category": "A01:2025 - Broken Access Control / A02 Misconfiguration",
                 "evidence": str(p), "location": url,
-                "remediation": "Block or remove sensitive files/endpoints from public access."
+                "remediation": "Block or remove sensitive files/endpoints from public access. Verify not soft-404."
+            })
+        elif path in high and status in (401, 403):
+            findings.append({
+                "title": f"Sensitive path blocked [{status}]: /{path}",
+                "severity": "info",
+                "category": "A01:2025 - Broken Access Control / A02 Misconfiguration",
+                "evidence": str(p), "location": url,
+                "remediation": "Path is not publicly readable (good). Keep blocked; confirm no bypass."
             })
         elif path in medium and status == 200:
             findings.append({

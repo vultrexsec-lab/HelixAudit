@@ -6,6 +6,7 @@ from datetime import datetime
 from ..core.database import SessionLocal
 from ..models.models import Scan, Asset, Finding, ScanStatus, Severity
 from ..pipeline.engine import PipelineEngine, default_tool_chain
+from .finding_quality import mask_secrets, dedupe_findings, risk_score, build_executive_summary
 from ..scanners.auth_scan import attempt_form_login, authenticated_crawl
 
 
@@ -108,18 +109,45 @@ async def run_discovery_scan(scan_id: int):
             if path.get("url"):
                 db.add(Asset(scan_id=scan.id, asset_type="path", value=path.get("url"), extra_data=path))
 
+        raw = []
         for f in ctx.findings:
+            raw.append({
+                "title": f.title[:500] if f.title else "Finding",
+                "description": f"[{f.source_tool}] {f.title}"[:1000],
+                "severity": _sev(f.severity),
+                "category": (f.category or "general")[:100],
+                "evidence": mask_secrets((f.evidence or "")[:5000]),
+                "location": (f.location or "")[:1000],
+                "remediation": (f.remediation or "")[:2000],
+                "source_tool": f.source_tool,
+            })
+        cleaned = dedupe_findings(raw)
+        for f in cleaned:
+            score = risk_score(f.get("severity"), f.get("category"), f.get("location"))
             db.add(Finding(
                 scan_id=scan.id,
-                title=f.title[:500] if f.title else "Finding",
-                description=f"[{f.source_tool}] {f.title}"[:1000],
-                severity=_sev(f.severity),
-                category=(f.category or "general")[:100],
-                evidence=(f.evidence or "")[:5000],
-                location=(f.location or "")[:1000],
-                remediation=(f.remediation or "")[:2000],
-                extra_data={"source_tool": f.source_tool},
+                title=f["title"],
+                description=f.get("description"),
+                severity=f.get("severity") or "info",
+                category=f.get("category"),
+                evidence=f.get("evidence"),
+                location=f.get("location"),
+                remediation=f.get("remediation"),
+                extra_data={"source_tool": f.get("source_tool"), "risk_score": score},
             ))
+        # Executive summary finding
+        exec_sum = build_executive_summary(target, cleaned, len(ctx.urls) + len(ctx.domains))
+        db.add(Finding(
+            scan_id=scan.id,
+            title="Executive Summary",
+            description=exec_sum[:2000],
+            severity="info",
+            category="Executive Summary",
+            evidence=exec_sum[:5000],
+            location=target,
+            remediation="Share executive summary with stakeholders; track Critical/High to closure.",
+            extra_data={"risk_score": 0, "type": "executive_summary"},
+        ))
 
         ok = sum(1 for t in ctx.tool_logs if t.get("status") == "ok")
         err = sum(1 for t in ctx.tool_logs if t.get("status") == "error")

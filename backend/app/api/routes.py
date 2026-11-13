@@ -400,3 +400,65 @@ def cancel_scan(scan_id: int, db: Session = Depends(get_db)):
     scan.completed_at = datetime.utcnow()
     db.commit()
     return {"id": scan.id, "status": scan.status, "message": "cancelled"}
+
+
+@router.get("/scans/compare")
+def compare_scans(scan_a: int, scan_b: int, db: Session = Depends(get_db)):
+    """Compare two scans: new issues, fixed issues, unchanged."""
+    a = db.query(Scan).filter(Scan.id == scan_a).first()
+    b = db.query(Scan).filter(Scan.id == scan_b).first()
+    if not a or not b:
+        raise HTTPException(status_code=404, detail="Scan not found")
+    fa = db.query(Finding).filter(Finding.scan_id == scan_a).all()
+    fb = db.query(Finding).filter(Finding.scan_id == scan_b).all()
+
+    def key(f):
+        return ((f.title or "")[:80].lower(), (f.location or "")[:80].lower())
+
+    map_a = {key(f): f for f in fa if (f.category or "") != "Executive Summary"}
+    map_b = {key(f): f for f in fb if (f.category or "") != "Executive Summary"}
+    keys_a, keys_b = set(map_a), set(map_b)
+    new_in_b = keys_b - keys_a
+    gone_in_b = keys_a - keys_b
+    same = keys_a & keys_b
+    return {
+        "scan_a": scan_a,
+        "scan_b": scan_b,
+        "new_in_b": [{"title": map_b[k].title, "severity": map_b[k].severity, "location": map_b[k].location} for k in list(new_in_b)[:50]],
+        "resolved_since_a": [{"title": map_a[k].title, "severity": map_a[k].severity, "location": map_a[k].location} for k in list(gone_in_b)[:50]],
+        "unchanged": len(same),
+        "counts": {
+            "a_total": len(map_a),
+            "b_total": len(map_b),
+            "new": len(new_in_b),
+            "resolved": len(gone_in_b),
+        },
+    }
+
+
+@router.post("/findings/{finding_id}/retest")
+def retest_finding(finding_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    """Create a focused follow-up scan on the finding location/target."""
+    finding = db.query(Finding).filter(Finding.id == finding_id).first()
+    if not finding:
+        raise HTTPException(status_code=404, detail="Finding not found")
+    parent = db.query(Scan).filter(Scan.id == finding.scan_id).first()
+    if not parent:
+        raise HTTPException(status_code=404, detail="Parent scan not found")
+    target = finding.location or parent.target
+    # Prefer origin if location is a full URL path-only issue
+    if target.startswith("/"):
+        target = parent.target
+    new_scan = Scan(
+        project_id=parent.project_id,
+        target=target,
+        scan_type="retest",
+        status=ScanStatus.PENDING.value,
+        config={"retest_of_finding": finding_id, "parent_scan": parent.id},
+    )
+    db.add(new_scan)
+    finding.status = "retest"
+    db.commit()
+    db.refresh(new_scan)
+    background_tasks.add_task(run_discovery_scan, new_scan.id)
+    return {"scan_id": new_scan.id, "status": "started", "retest_of": finding_id}

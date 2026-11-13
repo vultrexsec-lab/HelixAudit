@@ -39,7 +39,13 @@ def build_pdf_report(scan, project, findings, assets, counts) -> bytes:
         muted,
     ))
 
+    exec_findings = [f for f in findings if (getattr(f, "category", None) or "") == "Executive Summary"]
+    exec_text = (exec_findings[0].evidence if exec_findings else "") or ""
     story.append(Paragraph("1. Executive Summary", h2))
+    if exec_text:
+        for line in exec_text.splitlines()[:12]:
+            story.append(Paragraph(line.replace("&", "&amp;").replace("<", "&lt;"), small))
+        story.append(Spacer(1, 6))
     summary = [[
         f"Critical: {counts.get('critical', 0)}",
         f"High: {counts.get('high', 0)}",

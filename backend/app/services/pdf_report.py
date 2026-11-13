@@ -83,7 +83,23 @@ def build_pdf_report(scan, project, findings, assets, counts) -> bytes:
         if f not in auth_fs and (getattr(f, "category", None) or "") != "Executive Summary"
     ]
 
-    story.append(_p("2. Public surface findings", h2))
+    # Coverage matrix
+    matrix_f = next((f for f in findings if (getattr(f, "category", None) or "") == "VAPT-Coverage-Matrix"), None)
+    if matrix_f and isinstance(getattr(matrix_f, "extra_data", None), dict):
+        story.append(_p("2. VAPT coverage matrix", h2))
+        summary = (matrix_f.extra_data or {}).get("summary") or {}
+        story.append(_p(
+            f"Pass={summary.get('pass',0)} Fail={summary.get('fail',0)} "
+            f"Info={summary.get('info_only',0)} Not tested={summary.get('not_tested',0)} Error={summary.get('error',0)}",
+            small,
+        ))
+        for r in (matrix_f.extra_data.get("matrix") or [])[:25]:
+            story.append(_p(
+                f"[{r.get('status')}] {r.get('chapter')}: {r.get('name')} — {r.get('detail')}",
+                small,
+            ))
+    story.append(_p("3. Public surface findings", h2))
+
     story.append(_p(f"Count: {len(pub_fs)}", small))
     if not pub_fs:
         story.append(_p("No public findings recorded.", body))
@@ -97,7 +113,7 @@ def build_pdf_report(scan, project, findings, assets, counts) -> bytes:
                 small,
             ))
 
-    story.append(_p("3. Authenticated findings", h2))
+    story.append(_p("4. Authenticated findings", h2))
     if not auth_fs:
         story.append(_p("No authenticated findings (login not used or failed).", body))
     else:
@@ -108,7 +124,7 @@ def build_pdf_report(scan, project, findings, assets, counts) -> bytes:
                 small,
             ))
 
-    story.append(_p("4. Asset sample", h2))
+    story.append(_p("5. Asset sample", h2))
     if not assets:
         story.append(_p("No assets.", body))
     else:

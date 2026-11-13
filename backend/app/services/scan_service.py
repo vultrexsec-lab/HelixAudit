@@ -8,6 +8,7 @@ from ..models.models import Scan, Asset, Finding, ScanStatus, Severity
 from ..pipeline.engine import PipelineEngine, default_tool_chain
 from .finding_quality import mask_secrets, dedupe_findings, risk_score, build_executive_summary
 from .notify import send_scan_complete_email, email_configured
+from .vapt_matrix import build_check_matrix, matrix_summary, chapter_findings
 from ..scanners.auth_scan import attempt_form_login, authenticated_crawl, auth_findings_from_pages
 
 
@@ -165,6 +166,32 @@ async def run_discovery_scan(scan_id: int):
             extra_data={"tool_logs": ctx.tool_logs},
         ))
         db.commit()
+
+
+        # VAPT coverage matrix (Pass/Fail/Not-tested)
+        try:
+            raw_for_matrix = []
+            for f in cleaned:
+                raw_for_matrix.append(f)
+            # include pipeline summary already in DB? use cleaned + we'll add matrix after auth
+            auth_configured = bool(config.get("username") and config.get("password"))
+            matrix_rows = build_check_matrix(ctx.tool_logs, raw_for_matrix, auth_configured=auth_configured)
+            # auth row updated after auth stage; preliminary matrix stored
+            summary = matrix_summary(matrix_rows)
+            db.add(Finding(
+                scan_id=scan.id,
+                title="VAPT coverage matrix (Pass/Fail/Not-tested)",
+                description=f"pass={summary.get('pass')} fail={summary.get('fail')} not_tested={summary.get('not_tested')} error={summary.get('error')}",
+                severity=Severity.INFO.value,
+                category="VAPT-Coverage-Matrix",
+                evidence=str(matrix_rows)[:15000],
+                location=target,
+                remediation="Expand not_tested checks (install tools, provide auth credentials).",
+                extra_data={"type": "coverage_matrix", "summary": summary, "matrix": matrix_rows},
+            ))
+            db.commit()
+        except Exception as me:
+            print("matrix error:", me)
 
         # Optional authenticated deep stage (Phase A)
         if config.get("username") and config.get("password"):

@@ -208,9 +208,11 @@ def _build_report_data(db: Session, scan_id: int):
 
 
 @router.get("/scans/{scan_id}/report")
+
 def generate_report(scan_id: int, db: Session = Depends(get_db)):
-    """Professional HTML report (print / Save as PDF from browser)."""
+    """Professional HTML VAPT report with coverage matrix + chapters."""
     from fastapi.responses import HTMLResponse
+    from ..services.vapt_matrix import chapter_findings as group_chapters
 
     data = _build_report_data(db, scan_id)
     if not data:
@@ -220,59 +222,113 @@ def generate_report(scan_id: int, db: Session = Depends(get_db)):
         data["scan"], data["project"], data["findings"], data["assets"], data["counts"]
     )
 
-    def exposure_of(f):
-        extra = f.extra_data or {}
-        if isinstance(extra, dict) and extra.get("exposure"):
-            return extra.get("exposure")
-        cat = (f.category or "").lower()
-        if "authenticated" in cat or "auth " in cat:
-            return "auth"
-        return "public"
-
     def rows_for(items):
         rows = ""
         for f in items:
-            evidence = (f.evidence or "")[:300].replace("<", "&lt;").replace(">", "&gt;")
-            remediation = (f.remediation or "")[:250].replace("<", "&lt;").replace(">", "&gt;")
-            score = ""
-            if isinstance(f.extra_data, dict) and f.extra_data.get("risk_score") is not None:
-                score = f" · risk {f.extra_data.get('risk_score')}"
+            evidence = (getattr(f, "evidence", None) or "")[:300].replace("<", "&lt;").replace(">", "&gt;")
+            remediation = (getattr(f, "remediation", None) or "")[:250].replace("<", "&lt;").replace(">", "&gt;")
+            title = (getattr(f, "title", None) or "").replace("<", "&lt;")
+            loc = getattr(f, "location", None) or ""
+            cat = getattr(f, "category", None) or ""
+            sev = getattr(f, "severity", None) or "info"
+            st = getattr(f, "status", None) or "new"
             rows += f"""
         <tr>
-          <td><span class="sev {f.severity}">{(f.severity or '').upper()}</span></td>
+          <td><span class="sev {sev}">{sev.upper()}</span></td>
           <td>
-            <strong>{(f.title or '').replace('<','&lt;')}</strong>{score}<br/>
-            <small>{(f.location or '')}</small>
+            <strong>{title}</strong><br/>
+            <small>{loc}</small>
             {f'<div class="ev">{evidence}</div>' if evidence else ''}
             {f'<div class="rem"><b>Remediation:</b> {remediation}</div>' if remediation else ''}
           </td>
-          <td>{(f.category or '')}</td>
-          <td>{(f.status or 'new')}</td>
+          <td>{cat}</td>
+          <td>{st}</td>
         </tr>"""
         return rows or '<tr><td colspan="4">No findings in this section</td></tr>'
 
-    public_findings = [f for f in findings if exposure_of(f) != "auth" and (f.category or "") != "Executive Summary"]
-    auth_findings = [f for f in findings if exposure_of(f) == "auth"]
     exec_findings = [f for f in findings if (f.category or "") == "Executive Summary"]
+    matrix_finding = next((f for f in findings if (f.category or "") == "VAPT-Coverage-Matrix"), None)
     exec_html = ""
     if exec_findings:
-        exec_html = "<pre style=\"white-space:pre-wrap;background:#f8fafc;padding:1rem;border-radius:8px;\">" + (
-            (exec_findings[0].evidence or exec_findings[0].description or "").replace("<", "&lt;")
-        ) + "</pre>"
-    rows_public = rows_for(public_findings)
-    rows_auth = rows_for(auth_findings)
+        ex = (exec_findings[0].evidence or exec_findings[0].description or "").replace("<", "&lt;")
+        exec_html = f'<pre style="white-space:pre-wrap;background:#f8fafc;padding:1rem;border-radius:8px;">{ex}</pre>'
+
+    matrix_html = "<h2>VAPT coverage matrix</h2><p class='meta'>Matrix not generated for this scan (re-run scan on v1.7+).</p>"
+    if matrix_finding and isinstance(matrix_finding.extra_data, dict):
+        matrix = matrix_finding.extra_data.get("matrix") or []
+        summary = matrix_finding.extra_data.get("summary") or {}
+        mrows = ""
+        for r in matrix:
+            st = r.get("status") or ""
+            mrows += (
+                f"<tr><td>{r.get('chapter','')}</td><td>{r.get('name','')}</td>"
+                f"<td><span class='st {st}'>{st}</span></td><td>{r.get('detail') or ''}</td></tr>"
+            )
+        matrix_html = f"""
+  <h2>VAPT coverage matrix (Pass / Fail / Not-tested)</h2>
+  <div class="summary">
+    <div class="box"><strong>{summary.get("pass",0)}</strong>Pass</div>
+    <div class="box"><strong>{summary.get("fail",0)}</strong>Fail</div>
+    <div class="box"><strong>{summary.get("info_only",0)}</strong>Info</div>
+    <div class="box"><strong>{summary.get("not_tested",0)}</strong>Not tested</div>
+    <div class="box"><strong>{summary.get("error",0)}</strong>Error</div>
+  </div>
+  <table>
+    <thead><tr><th>Chapter</th><th>Check</th><th>Status</th><th>Detail</th></tr></thead>
+    <tbody>{mrows or '<tr><td colspan="4">No matrix</td></tr>'}</tbody>
+  </table>
+"""
+
+    as_dicts = []
+    for f in findings:
+        as_dicts.append({
+            "title": f.title, "severity": f.severity, "category": f.category,
+            "location": f.location, "evidence": f.evidence, "remediation": f.remediation,
+            "status": f.status, "extra_data": f.extra_data or {},
+        })
+    chapters = group_chapters(as_dicts)
+    chapter_html = ""
+    for ch_name in ["Reconnaissance", "Configuration", "Enumeration", "Vulnerability Assessment", "Authenticated Testing", "Other"]:
+        items = chapters.get(ch_name) or []
+        class FObj:
+            pass
+        flist = []
+        for d in items:
+            if d.get("category") in ("Executive Summary", "VAPT-Coverage-Matrix"):
+                continue
+            o = FObj()
+            o.title = d.get("title")
+            o.severity = d.get("severity")
+            o.category = d.get("category")
+            o.location = d.get("location")
+            o.evidence = d.get("evidence")
+            o.remediation = d.get("remediation")
+            o.status = d.get("status")
+            o.extra_data = d.get("extra_data") or {}
+            flist.append(o)
+        chapter_html += (
+            f"<h2>{ch_name} ({len(flist)})</h2>"
+            f"<table><thead><tr><th>Severity</th><th>Title / Evidence / Remediation</th>"
+            f"<th>Category</th><th>Status</th></tr></thead>"
+            f"<tbody>{rows_for(flist)}</tbody></table>"
+        )
 
     asset_rows = "".join(
         f"<tr><td>{a.asset_type}</td><td>{(a.value or '')[:120]}</td></tr>"
         for a in assets[:100]
     )
 
+    client = ""
+    if project and getattr(project, "client_name", None):
+        client = f"<div><strong>Prepared for:</strong> {project.client_name}</div>"
+
     html = f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8">
-<title>HelixAudit Report - Scan #{scan.id}</title>
+<title>HelixAudit VAPT Report - Scan #{scan.id}</title>
 <style>
   body {{ font-family: system-ui, -apple-system, sans-serif; margin: 2rem; color: #0f172a; }}
   h1 {{ margin-bottom: 0.25rem; }}
+  h2 {{ margin-top: 1.75rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.35rem; }}
   .meta {{ color: #64748b; margin-bottom: 1.5rem; font-size: 0.95rem; }}
   .summary {{ display: flex; gap: 0.75rem; flex-wrap: wrap; margin: 1rem 0 1.5rem; }}
   .box {{ background: #f1f5f9; padding: 0.9rem 1.1rem; border-radius: 8px; min-width: 90px; text-align: center; }}
@@ -286,27 +342,30 @@ def generate_report(scan_id: int, db: Session = Depends(get_db)):
   .medium {{ background: #fef3c7; color: #92400e; }}
   .low {{ background: #dbeafe; color: #1e40af; }}
   .info {{ background: #f1f5f9; color: #475569; }}
-  .ev, .rem {{ color: #64748b; font-size: 0.8rem; margin-top: 0.25rem; }}
-  .footer {{ margin-top: 2rem; font-size: 0.8rem; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 1rem; }}
-  .actions {{ margin: 1rem 0; }}
-  .actions button {{ margin-right: 0.5rem; padding: 0.45rem 0.9rem; border-radius: 6px; border: 1px solid #cbd5e1; background: #fff; cursor: pointer; }}
-  @media print {{ .actions {{ display: none; }} body {{ margin: 0.5rem; }} }}
-</style></head>
+  .st {{ padding: 0.12rem 0.4rem; border-radius: 4px; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; }}
+  .st.pass {{ background: #dcfce7; color: #166534; }}
+  .st.fail {{ background: #fee2e2; color: #991b1b; }}
+  .st.not_tested {{ background: #e2e8f0; color: #475569; }}
+  .st.error {{ background: #ffedd5; color: #9a3412; }}
+  .st.info_only {{ background: #e0f2fe; color: #075985; }}
+  .ev {{ color: #64748b; font-size: 0.82rem; margin-top: 0.25rem; }}
+  .rem {{ color: #334155; font-size: 0.82rem; margin-top: 0.2rem; }}
+  .footer {{ margin-top: 2rem; color: #94a3b8; font-size: 0.85rem; }}
+  .actions button {{ margin: 0.5rem 0 1rem; padding: 0.5rem 1rem; }}
+</style>
+</head>
 <body>
-  <h1>HelixAudit Security Assessment Report</h1>
+  <h1>HelixAudit — VAPT Assessment Report</h1>
   <div class="meta">
-    <div><strong>Prepared for:</strong> {(project.client_name if project and project.client_name else (project.name if project else 'N/A'))}</div>
-    <div><strong>Project:</strong> {project.name if project else 'N/A'} {f'({project.client_name})' if project and project.client_name else ''}</div>
+    {client}
+    <div><strong>Project:</strong> {project.name if project else 'N/A'}</div>
     <div><strong>Target:</strong> {scan.target}</div>
     <div><strong>Scan ID:</strong> #{scan.id} &nbsp;|&nbsp; <strong>Status:</strong> {scan.status}</div>
     <div><strong>Window:</strong> {scan.started_at} → {scan.completed_at}</div>
   </div>
+  <div class="actions"><button onclick="window.print()">Print / Save as PDF</button></div>
 
-  <div class="actions">
-    <button onclick="window.print()">Print / Save as PDF</button>
-  </div>
-
-  <h2>Executive Summary</h2>
+  <h2>1. Executive Summary</h2>
   <div class="summary">
     <div class="box"><strong>{counts['critical']}</strong>Critical</div>
     <div class="box"><strong>{counts['high']}</strong>High</div>
@@ -314,32 +373,23 @@ def generate_report(scan_id: int, db: Session = Depends(get_db)):
     <div class="box"><strong>{counts['low']}</strong>Low</div>
     <div class="box"><strong>{counts['info']}</strong>Info</div>
     <div class="box"><strong>{len(assets)}</strong>Assets</div>
-    <div class="box"><strong>{len(findings)}</strong>Findings</div>
   </div>
-
   {exec_html}
-  <h2>Public surface findings ({len(public_findings)})</h2>
-  <table>
-    <thead><tr><th>Severity</th><th>Title / Evidence / Remediation</th><th>Category</th><th>Status</th></tr></thead>
-    <tbody>{rows_public}</tbody>
-  </table>
 
-  <h2>Authenticated findings ({len(auth_findings)})</h2>
-  <p style="color:#64748b">Requires successful login credentials during scan. Empty if auth was not used or login failed.</p>
-  <table>
-    <thead><tr><th>Severity</th><th>Title / Evidence / Remediation</th><th>Category</th><th>Status</th></tr></thead>
-    <tbody>{rows_auth}</tbody>
-  </table>
+  {matrix_html}
 
-  <h2>Discovered Assets (sample)</h2>
+  <h2>3. Findings by VAPT chapter</h2>
+  {chapter_html}
+
+  <h2>4. Discovered Assets (sample)</h2>
   <table>
     <thead><tr><th>Type</th><th>Value</th></tr></thead>
     <tbody>{asset_rows or '<tr><td colspan="2">No assets</td></tr>'}</tbody>
   </table>
 
   <div class="footer">
-    Generated by HelixAudit v1.6.2 • Authorized testing only • Confidential<br/>
-    This automated report supports professional assessment and does not replace expert manual testing.
+    Generated by HelixAudit v1.7.0 • Authorized testing only • Confidential<br/>
+    Coverage matrix shows what was tested. Full VAPT sign-off still requires expert manual review.
   </div>
 </body></html>"""
     return HTMLResponse(content=html)

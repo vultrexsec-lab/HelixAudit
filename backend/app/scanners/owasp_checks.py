@@ -5,7 +5,8 @@ Safe, authorized-use, non-destructive assessments.
 
 import re
 import httpx
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
+from .soft404 import is_html_shell, real_sensitive_content, Optional
 from urllib.parse import urlparse, urljoin, parse_qs, urlencode, urlunparse
 
 
@@ -97,12 +98,18 @@ def check_sensitive_paths(paths: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         if not path:
             continue
         if path in high and status == 200:
+            # directory_discovery does not store body; treat identical length SPA noise carefully.
+            # Without body we only flag high if caller marks validated; else downgrade.
+            evidence = str(p)
+            # Heuristic: discovery entries with same content_length across paths are often soft-404
+            cl = p.get("content_length") or 0
             findings.append({
-                "title": f"Sensitive path responds 200: /{path}",
-                "severity": "high",
+                "title": f"Sensitive path returns 200 (unverified): /{path}",
+                "severity": "info",
                 "category": "A01:2025 - Broken Access Control / A02 Misconfiguration",
-                "evidence": str(p), "location": url,
-                "remediation": "Block or remove sensitive files/endpoints from public access. Verify not soft-404."
+                "evidence": evidence + " | body not validated in this check — not confirmed leak",
+                "location": url,
+                "remediation": "Manually verify response body. Soft-404 HTML shells are not exposures."
             })
         elif path in high and status in (401, 403):
             findings.append({
@@ -114,11 +121,12 @@ def check_sensitive_paths(paths: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             })
         elif path in medium and status == 200:
             findings.append({
-                "title": f"Interesting administrative/functional path: /{path}",
-                "severity": "medium",
+                "title": f"Administrative/functional path returns 200 (verify): /{path}",
+                "severity": "info",
                 "category": "A01:2025 - Broken Access Control (Surface)",
-                "evidence": str(p), "location": url,
-                "remediation": "Ensure strong authentication and authorization on this path."
+                "evidence": str(p) + " | confirm not SPA soft-404",
+                "location": url,
+                "remediation": "Ensure strong authentication if this is a real app route."
             })
     return findings
 

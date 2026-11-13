@@ -4,7 +4,8 @@ Deeper (still safe) active surface checks for authorized scanning.
 
 import httpx
 from typing import List, Dict, Any
-from urllib.parse import urlparse, urljoin
+from urllib.parse import urlparse
+from .soft404 import is_soft404, real_sensitive_content, body_hash
 
 
 async def check_http_methods(client: httpx.AsyncClient, url: str) -> List[Dict[str, Any]]:
@@ -66,29 +67,52 @@ async def check_sensitive_files(client: httpx.AsyncClient, base_url: str) -> Lis
     findings = []
     parsed = urlparse(base_url if "://" in base_url else f"https://{base_url}")
     origin = f"{parsed.scheme}://{parsed.netloc}"
+
+    baseline = set()
+    try:
+        home = await client.get(origin + "/", timeout=8.0)
+        baseline.add(body_hash(home.content))
+    except Exception:
+        pass
+    try:
+        rnd = await client.get(origin + "/helixaudit-soft404-probe-99999", timeout=6.0)
+        if rnd.status_code == 200:
+            baseline.add(body_hash(rnd.content))
+    except Exception:
+        pass
+
     paths = [
         "/.env", "/.git/HEAD", "/.git/config", "/backup.sql", "/db.sql",
-        "/phpinfo.php", "/.ds_store", "/web.config", "/crossdomain.xml",
-        "/security.txt", "/.well-known/security.txt", "/server-status",
+        "/phpinfo.php", "/server-status",
         "/actuator/health", "/actuator/env", "/api/swagger.json", "/swagger.json",
-        "/graphql", "/robots.txt",
+        "/graphql",
     ]
     for path in paths:
         url = origin + path
         try:
             resp = await client.get(url, timeout=6.0, follow_redirects=False)
-            if resp.status_code == 200 and len(resp.content) > 0:
-                # skip boring robots empty
-                body_preview = (resp.text or "")[:200]
-                high = any(x in path for x in [".env", ".git", "backup", "phpinfo", "actuator/env", "db.sql"])
-                findings.append({
-                    "title": f"Accessible sensitive/interesting file: {path}",
-                    "severity": "high" if high else "medium",
-                    "category": "A01:2025 - Broken Access Control / Information Disclosure",
-                    "evidence": f"Status 200, length={len(resp.content)}, preview={body_preview[:80]}",
-                    "location": url,
-                    "remediation": "Block public access to sensitive files and admin endpoints."
-                })
+            if resp.status_code != 200 or len(resp.content) == 0:
+                continue
+            ct = resp.headers.get("content-type", "")
+            text = resp.text or ""
+            if is_soft404(resp.content, ct, baseline, text):
+                # Only escalate if real sensitive content is present
+                if not real_sensitive_content(path, resp.content, text):
+                    continue
+            elif not real_sensitive_content(path, resp.content, text):
+                # 200 but not validated content — info at most for admin-ish, skip file claims
+                if any(x in path for x in [".env", ".git", "backup", "db.sql", "phpinfo", "actuator/env"]):
+                    continue
+
+            high = any(x in path for x in [".env", ".git", "backup", "phpinfo", "actuator/env", "db.sql"])
+            findings.append({
+                "title": f"Likely real sensitive file: {path}",
+                "severity": "high" if high else "medium",
+                "category": "A01:2025 - Broken Access Control / Information Disclosure",
+                "evidence": f"Status 200, length={len(resp.content)}, content-type={ct}, preview={(text[:80])}",
+                "location": url,
+                "remediation": "Block public access to sensitive files immediately."
+            })
         except Exception:
             continue
     return findings

@@ -238,7 +238,7 @@
             <input id="password" type="password" placeholder="Used only for this scan" />
           </div>
           <div>
-            <label>Login URL (optional)</label>
+            <label>Login URL (optional — for authenticated deep scan)</label>
             <input id="loginUrl" placeholder="/login or full URL" />
           </div>
         </div>
@@ -549,6 +549,7 @@ function renderFindings() {
         <div class="evidence">${esc(f.location || "")}</div>
         <div class="evidence">${esc(String(f.evidence || "").slice(0, 180))}</div>
         <div class="evidence"><em>${esc(String(f.remediation || "").slice(0, 140))}</em></div>
+        <div class="evidence">${(f.extra_data && f.extra_data.exposure) ? ("Exposure: " + f.extra_data.exposure) : ""}${(f.extra_data && f.extra_data.risk_score!=null) ? (" · Risk " + f.extra_data.risk_score) : ""}</div>
       </td>
       <td>${esc(f.category || "—")}</td>
       <td>${esc(f.status || "new")}</td>

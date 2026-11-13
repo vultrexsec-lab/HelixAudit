@@ -7,7 +7,7 @@ from ..core.database import SessionLocal
 from ..models.models import Scan, Asset, Finding, ScanStatus, Severity
 from ..pipeline.engine import PipelineEngine, default_tool_chain
 from .finding_quality import mask_secrets, dedupe_findings, risk_score, build_executive_summary
-from ..scanners.auth_scan import attempt_form_login, authenticated_crawl
+from ..scanners.auth_scan import attempt_form_login, authenticated_crawl, auth_findings_from_pages
 
 
 def _sev(s: str) -> str:
@@ -133,7 +133,7 @@ async def run_discovery_scan(scan_id: int):
                 evidence=f.get("evidence"),
                 location=f.get("location"),
                 remediation=f.get("remediation"),
-                extra_data={"source_tool": f.get("source_tool"), "risk_score": score},
+                extra_data={"source_tool": f.get("source_tool"), "risk_score": score, "exposure": "public"},
             ))
         # Executive summary finding
         exec_sum = build_executive_summary(target, cleaned, len(ctx.urls) + len(ctx.domains))
@@ -165,7 +165,7 @@ async def run_discovery_scan(scan_id: int):
         ))
         db.commit()
 
-        # Optional authenticated stage
+        # Optional authenticated deep stage (Phase A)
         if config.get("username") and config.get("password"):
             scan.progress = 94
             db.commit()
@@ -173,32 +173,41 @@ async def run_discovery_scan(scan_id: int):
                 auth_client, auth_info = await attempt_form_login(
                     target, config["username"], config["password"], config.get("login_url")
                 )
-                db.add(Finding(
-                    scan_id=scan.id,
-                    title="Authenticated stage attempted",
-                    description=(auth_info.get("message") or "")[:500],
-                    severity=Severity.INFO.value,
-                    category="Authenticated Scanning",
-                    evidence=str(auth_info)[:3000],
-                    location=auth_info.get("login_url") or target,
-                    remediation="Verify authorization on authenticated resources.",
-                ))
+                auth_pages = []
                 if auth_client:
                     try:
-                        if auth_info.get("success"):
-                            for ap in await authenticated_crawl(auth_client, target):
-                                db.add(Asset(
-                                    scan_id=scan.id,
-                                    asset_type="auth_page",
-                                    value=ap.get("url") or "",
-                                    extra_data=ap,
-                                ))
+                        auth_pages = await authenticated_crawl(auth_client, target, max_pages=25)
+                        for ap in auth_pages:
+                            db.add(Asset(
+                                scan_id=scan.id,
+                                asset_type="auth_page",
+                                value=ap.get("url") or "",
+                                extra_data={**(ap or {}), "exposure": "auth"},
+                            ))
                         await auth_client.aclose()
                     except Exception:
                         try:
                             await auth_client.aclose()
                         except Exception:
                             pass
+
+                for af in auth_findings_from_pages(auth_pages, auth_info):
+                    score = risk_score(af.get("severity"), af.get("category"), af.get("location"))
+                    db.add(Finding(
+                        scan_id=scan.id,
+                        title=(af.get("title") or "Auth finding")[:500],
+                        description=(af.get("title") or "")[:1000],
+                        severity=_sev(af.get("severity")),
+                        category=(af.get("category") or "Authenticated Scanning")[:100],
+                        evidence=mask_secrets((af.get("evidence") or "")[:5000]),
+                        location=(af.get("location") or target)[:1000],
+                        remediation=(af.get("remediation") or "")[:2000],
+                        extra_data={
+                            "source_tool": "auth_deep_scan",
+                            "risk_score": score,
+                            "exposure": af.get("exposure") or "auth",
+                        },
+                    ))
                 db.commit()
             except Exception as e:
                 print("auth stage error:", e)

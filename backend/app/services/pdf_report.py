@@ -63,7 +63,12 @@ def build_pdf_report(scan, project, findings, assets, counts) -> bytes:
     ]))
     story.append(t)
 
-    story.append(Paragraph("2. Findings (detail)", h2))
+    auth_fs = [f for f in findings if isinstance(getattr(f, "extra_data", None), dict) and (f.extra_data or {}).get("exposure") == "auth"]
+    pub_fs = [f for f in findings if f not in auth_fs and (getattr(f, "category", None) or "") != "Executive Summary"]
+    story.append(Paragraph("2. Public surface findings", h2))
+    findings = pub_fs  # used below
+    story.append(Paragraph(f"Count: {len(pub_fs)}", small))
+
     if not findings:
         story.append(Paragraph("No findings recorded.", body))
     else:
@@ -81,7 +86,21 @@ def build_pdf_report(scan, project, findings, assets, counts) -> bytes:
             ))
             story.append(Spacer(1, 4))
 
-    story.append(Paragraph("3. Asset sample", h2))
+    story.append(Paragraph("3. Authenticated findings", h2))
+    if not auth_fs:
+        story.append(Paragraph("No authenticated findings (login not used or failed).", body))
+    else:
+        for i, f in enumerate(auth_fs[:30], 1):
+            story.append(Paragraph(
+                f"<b>{i}. [{(f.severity or '').upper()}] {f.title or ''}</b>",
+                small,
+            ))
+            story.append(Paragraph(
+                f"Location: {f.location or '—'}<br/>Evidence: {str(f.evidence or '—')[:250]}",
+                small,
+            ))
+    story.append(Paragraph("4. Asset sample", h2))
+
     if not assets:
         story.append(Paragraph("No assets.", body))
     else:

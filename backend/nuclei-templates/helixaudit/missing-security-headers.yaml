@@ -1,0 +1,27 @@
+id: helixaudit-missing-security-headers
+
+info:
+  name: Missing Common Security Headers
+  author: helixaudit
+  severity: medium
+  description: Detects absence of common browser security headers on HTTP responses.
+  tags: helixaudit,misconfig,headers
+
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+
+    matchers-condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+          - 301
+          - 302
+
+      - type: dsl
+        dsl:
+          - "!contains(to_lower(header), 'strict-transport-security')"
+          - "!contains(to_lower(header), 'content-security-policy')"
+        condition: or

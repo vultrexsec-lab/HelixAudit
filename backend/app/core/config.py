@@ -4,7 +4,7 @@ from typing import Optional, List
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "HelixAudit"
-    VERSION: str = "1.8.0"
+    VERSION: str = "1.8.1"
     API_V1_STR: str = "/api/v1"
 
     SECRET_KEY: str = "CHANGE-THIS-IN-PRODUCTION-USE-OPENSSL-RAND-32"
@@ -32,6 +32,15 @@ class Settings(BaseSettings):
     SMTP_FROM: Optional[str] = None
     SMTP_TLS: bool = True
     NOTIFY_EMAIL_TO: Optional[str] = None
+
+    # Nuclei customization
+    NUCLEI_SEVERITY: str = "critical,high,medium"
+    NUCLEI_TAGS: str = ""  # e.g. "helixaudit,cve,misconfig"
+    NUCLEI_EXCLUDE_TAGS: str = "dos,fuzz"
+    NUCLEI_TEMPLATE_PATH: str = ""  # default: backend/nuclei-templates
+    NUCLEI_USE_DEFAULT: bool = True
+    NUCLEI_RATE_LIMIT: int = 40
+    NUCLEI_TIMEOUT: int = 5
 
     class Config:
         env_file = ".env"

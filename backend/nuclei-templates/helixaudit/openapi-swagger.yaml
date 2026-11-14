@@ -1,0 +1,33 @@
+id: helixaudit-openapi-swagger
+
+info:
+  name: OpenAPI / Swagger UI Exposed
+  author: helixaudit
+  severity: medium
+  description: Detects publicly reachable Swagger or OpenAPI documents.
+  tags: helixaudit,api,swagger
+
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/swagger-ui.html"
+      - "{{BaseURL}}/swagger/index.html"
+      - "{{BaseURL}}/v3/api-docs"
+      - "{{BaseURL}}/openapi.json"
+      - "{{BaseURL}}/api-docs"
+
+    stop-at-first-match: true
+
+    matchers-condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+
+      - type: word
+        words:
+          - "swagger"
+          - "openapi"
+          - "api-docs"
+        condition: or
+        case-insensitive: true

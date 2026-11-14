@@ -1,0 +1,39 @@
+id: helixaudit-exposed-env-git
+
+info:
+  name: Potentially Exposed .env or .git
+  author: helixaudit
+  severity: high
+  description: Checks for substantive responses on sensitive paths (not just status codes).
+  tags: helixaudit,exposure,config
+
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/.env"
+      - "{{BaseURL}}/.git/HEAD"
+      - "{{BaseURL}}/.git/config"
+
+    stop-at-first-match: false
+
+    matchers-condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+
+      - type: word
+        words:
+          - "DB_PASSWORD"
+          - "APP_KEY"
+          - "DATABASE_URL"
+          - "ref: refs/"
+          - "[core]"
+        condition: or
+
+      - type: word
+        words:
+          - "<!doctype html"
+          - "<html"
+        negative: true
+        condition: or

@@ -397,7 +397,7 @@ async function startScan() {
     if (!projRes.ok) throw new Error(await projRes.text());
     const project = await projRes.json();
 
-    const body = { project_id: project.id, target, scan_type: "discovery" };
+    const body = { project_id: project.id, target, scan_type: "discovery", suite: (document.getElementById("suite")||{}).value || "standard" };
     const u = document.getElementById("username").value.trim();
     const p = document.getElementById("password").value;
     const l = document.getElementById("loginUrl").value.trim();

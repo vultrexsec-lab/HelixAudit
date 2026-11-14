@@ -34,6 +34,10 @@ class NucleiTool(BaseTool):
         return env_default
 
     async def run(self, ctx: PipelineContext) -> PipelineContext:
+        if str((ctx.config or {}).get("nuclei_enabled", True)).lower() in ("0", "false", "no"):
+            ctx.log_tool(self.name, "skipped", "disabled by suite/config")
+            return ctx
+
         binary = find_binary("nuclei")
         if not binary:
             ctx.log_tool(self.name, "skipped", "nuclei binary not found — run scripts/install_tools.sh")

@@ -38,6 +38,7 @@ class ScanCreate(BaseModel):
     project_id: int
     target: str
     scan_type: str = "discovery"
+    suite: str = "standard"  # quick | standard | full | owasp | nuclei_top
     # Optional authenticated scan
     username: str | None = None
     password: str | None = None
@@ -124,6 +125,10 @@ def create_scan(scan: ScanCreate, background_tasks: BackgroundTasks, db: Session
         config["password"] = scan.password  # note: sensitive; prefer ephemeral in production
     if scan.login_url:
         config["login_url"] = scan.login_url
+    if getattr(scan, "suite", None):
+        config["suite"] = scan.suite
+    elif scan.scan_type in ("quick", "standard", "full", "owasp", "nuclei_top"):
+        config["suite"] = scan.scan_type
 
     db_scan = Scan(
         project_id=scan.project_id,
@@ -469,6 +474,13 @@ def generate_pdf_report(scan_id: int, db: Session = Depends(get_db)):
 def generate_pdf_report_alt(scan_id: int, db: Session = Depends(get_db)):
     """Alternate path for clients that mishandle .pdf in the URL."""
     return _pdf_response(scan_id, db)
+
+
+@router.get("/pipeline/suites")
+def pipeline_suites():
+    """List Top Suite profiles for scans."""
+    from ..pipeline.suites import list_suites
+    return list_suites()
 
 
 @router.get("/pipeline/tools")

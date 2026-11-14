@@ -6,6 +6,7 @@ import asyncio
 from typing import List
 from .context import PipelineContext
 from .tools.base import BaseTool
+from .suites import filter_tools, apply_suite_to_config
 
 DEFAULT_TOOL_TIMEOUT = 45
 
@@ -20,10 +21,12 @@ class PipelineEngine:
         self.tools.sort(key=lambda t: t.order)
 
     async def run(self, target: str, config: dict | None = None, progress_cb=None) -> PipelineContext:
-        ctx = PipelineContext(target=target, config=config or {})
-        total = max(len(self.tools), 1)
+        config = apply_suite_to_config(config or {}, (config or {}).get("suite"))
+        tools = filter_tools(self.tools, config.get("suite"))
+        ctx = PipelineContext(target=target, config=config)
+        total = max(len(tools), 1)
 
-        for i, tool in enumerate(self.tools):
+        for i, tool in enumerate(tools):
             if progress_cb:
                 pct = 5 + int((i / total) * 90)
                 try:

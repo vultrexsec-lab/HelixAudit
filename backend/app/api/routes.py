@@ -476,6 +476,50 @@ def generate_pdf_report_alt(scan_id: int, db: Session = Depends(get_db)):
     return _pdf_response(scan_id, db)
 
 
+
+
+@router.get("/scans/{scan_id}/burp")
+def export_burp_package(scan_id: int, db: Session = Depends(get_db)):
+    """Export scan as Burp Suite handoff package (scope + URLs + issues)."""
+    from ..services.burp_export import build_burp_package
+    data = _build_report_data(db, scan_id)
+    if not data:
+        raise HTTPException(status_code=404, detail="Scan not found")
+    return build_burp_package(data["scan"], data["assets"], data["findings"])
+
+
+@router.get("/scans/{scan_id}/burp/urls.txt")
+def export_burp_urls_txt(scan_id: int, db: Session = Depends(get_db)):
+    """Plain URL list for Burp Target / Intruder paste."""
+    from fastapi.responses import PlainTextResponse
+    from ..services.burp_export import build_burp_package
+    data = _build_report_data(db, scan_id)
+    if not data:
+        raise HTTPException(status_code=404, detail="Scan not found")
+    pkg = build_burp_package(data["scan"], data["assets"], data["findings"])
+    return PlainTextResponse(pkg["url_list_text"] or "", media_type="text/plain")
+
+
+@router.post("/scans/{scan_id}/burp/push")
+async def push_to_burp(scan_id: int, db: Session = Depends(get_db)):
+    """Optional: push discovered URLs to local/remote Burp REST API."""
+    from ..services.burp_export import build_burp_package, push_urls_to_burp_api
+    from ..core.config import settings
+    if not settings.BURP_API_URL:
+        raise HTTPException(
+            status_code=400,
+            detail="BURP_API_URL not configured. Export /burp package and import into Burp manually.",
+        )
+    data = _build_report_data(db, scan_id)
+    if not data:
+        raise HTTPException(status_code=404, detail="Scan not found")
+    pkg = build_burp_package(data["scan"], data["assets"], data["findings"])
+    result = await push_urls_to_burp_api(
+        settings.BURP_API_URL, pkg["urls"], settings.BURP_API_KEY
+    )
+    return {"scan_id": scan_id, "burp_api": settings.BURP_API_URL, **result}
+
+
 @router.get("/pipeline/suites")
 def pipeline_suites():
     """List Top Suite profiles for scans."""

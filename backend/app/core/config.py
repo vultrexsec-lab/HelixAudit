@@ -4,7 +4,7 @@ from typing import Optional, List
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "HelixAudit"
-    VERSION: str = "1.9.0"
+    VERSION: str = "1.9.1"
     API_V1_STR: str = "/api/v1"
 
     SECRET_KEY: str = "CHANGE-THIS-IN-PRODUCTION-USE-OPENSSL-RAND-32"
@@ -41,6 +41,10 @@ class Settings(BaseSettings):
     NUCLEI_USE_DEFAULT: bool = True
     NUCLEI_RATE_LIMIT: int = 40
     NUCLEI_TIMEOUT: int = 5
+
+    # Burp Suite REST API (optional — Burp must run with REST API extension)
+    BURP_API_URL: Optional[str] = None
+    BURP_API_KEY: Optional[str] = None
 
     class Config:
         env_file = ".env"

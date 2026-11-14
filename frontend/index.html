@@ -216,6 +216,16 @@
         <h2>Start assessment</h2>
         <div class="row">
           <div>
+            <label>Top Suite profile</label>
+            <select id="suite">
+              <option value="standard" selected>Standard VAPT-Assist</option>
+              <option value="quick">Quick Surface</option>
+              <option value="full">Full Suite (Top)</option>
+              <option value="owasp">OWASP Top 10 Focus</option>
+              <option value="nuclei_top">Nuclei Top Templates</option>
+            </select>
+          </div>
+          <div>
             <label>Target URL / Domain *</label>
             <input id="target" placeholder="https://example.com" />
           </div>

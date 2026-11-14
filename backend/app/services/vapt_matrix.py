@@ -24,6 +24,12 @@ CANONICAL_CHECKS = [
     {"id": "va.active", "chapter": "Vulnerability Assessment", "name": "Active surface (CORS/methods/files)", "tools": ["active_checks"]},
     {"id": "va.injection", "chapter": "Vulnerability Assessment", "name": "Injection surface probes (SQLi/XSS)", "tools": ["injection_detect"]},
     {"id": "va.nuclei", "chapter": "Vulnerability Assessment", "name": "Template vulnerability scan (Nuclei)", "tools": ["nuclei"]},
+    {"id": "config.cookies", "chapter": "Configuration", "name": "Cookie security flags", "tools": ["cookie_flags"]},
+    {"id": "enum.dir_brute", "chapter": "Enumeration", "name": "Controlled directory brute", "tools": ["dir_brute"]},
+    {"id": "enum.swagger", "chapter": "Enumeration", "name": "Swagger/OpenAPI discovery", "tools": ["swagger_enum"]},
+    {"id": "enum.js", "chapter": "Enumeration", "name": "JS endpoints / cloud URL extraction", "tools": ["js_endpoints"]},
+    {"id": "va.upload", "chapter": "Vulnerability Assessment", "name": "File upload form surface", "tools": ["upload_surface"]},
+    {"id": "manual.tier_c", "chapter": "Manual (Tier C)", "name": "Expert manual VAPT checklist", "tools": ["tier_c_manual"]},
     {"id": "auth.session", "chapter": "Authenticated Testing", "name": "Authenticated session deep scan", "tools": ["auth_deep_scan"]},
 ]
 
